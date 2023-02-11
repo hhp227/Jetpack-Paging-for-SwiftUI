@@ -88,7 +88,7 @@ public class LazyPagingItems<T : Any>: ObservableObject, DifferCallback {
 private let InitialLoadStates = LoadStates(.Loading.instance, .NotLoading(false), .NotLoading(false))
 
 extension AnyPublisher where Failure == Never {
-    func collectAsLazyPagingItems<T>() -> LazyPagingItems<T> where Output == PagingData<T> {
+    public func collectAsLazyPagingItems<T>() -> LazyPagingItems<T> where Output == PagingData<T> {
         @State var lazyPagingItems = LazyPagingItems(self)
         
         DispatchQueue.main.async {
