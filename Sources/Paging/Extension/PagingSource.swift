@@ -87,7 +87,7 @@ open class PagingSource<Key: Any, Value: Any> {
         public class Error<Key: Any, Value: Any>: LoadResult<Key, Value> {
             var error: Swift.Error
             
-            init(error: Swift.Error) {
+            public init(error: Swift.Error) {
                 self.error = error
             }
         }
