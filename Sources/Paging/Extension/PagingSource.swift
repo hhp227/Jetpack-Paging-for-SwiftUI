@@ -10,6 +10,10 @@ import Accessibility
 // 애매하지만 완료
 open class PagingSource<Key: Any, Value: Any> {
     
+    public init() {
+        
+    }
+    
     private let invalidateCallbackTracker = InvalidateCallbackTracker(
         callbackInvoker: { $0() }
     )
