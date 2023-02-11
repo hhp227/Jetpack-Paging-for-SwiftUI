@@ -25,7 +25,7 @@ public class PagingConfig {
     
     internal static let DEFAULT_INITIAL_PAGE_MULTIPLIER = 3
     
-    init(pageSize: Int) {
+    public init(pageSize: Int) {
         self.pageSize = pageSize
         self.prefetchDistance = self.pageSize
         self.initialLoadSize = self.pageSize * PagingConfig.DEFAULT_INITIAL_PAGE_MULTIPLIER
