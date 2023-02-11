@@ -8,7 +8,7 @@
 import Foundation
 
 // 완료
-class PagingConfig {
+public class PagingConfig {
     let pageSize: Int
     
     let prefetchDistance: Int

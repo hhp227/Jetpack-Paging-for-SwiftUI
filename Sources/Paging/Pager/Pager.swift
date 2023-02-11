@@ -7,7 +7,7 @@
 
 import Combine
 
-class Pager<Key: Equatable, Value: Any> {
+public class Pager<Key: Equatable, Value: Any> {
     let publisher: AnyPublisher<PagingData<Value>, Never>
     
     init(_ config: PagingConfig, _ initialKey: Key? = nil, _ pagingSourceFactory: @escaping () -> PagingSource<Key, Value>) {

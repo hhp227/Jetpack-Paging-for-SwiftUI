@@ -8,7 +8,7 @@
 import Foundation
 import Combine
 
-class PagingData<T: Any> {
+public class PagingData<T: Any> {
     internal let currentValueSubject: CurrentValueSubject<PageEvent<T>, Never>
     
     internal let receiver: UiReceiver

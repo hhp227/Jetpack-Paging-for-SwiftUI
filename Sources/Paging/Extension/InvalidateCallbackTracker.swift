@@ -9,7 +9,7 @@ import Foundation
 
 typealias T = () -> Void
 
-internal class InvalidateCallbackTracker {
+class InvalidateCallbackTracker {
     private let callbackInvoker: (T) -> Void
     
     private let invalidGetter: (() -> Bool)?
