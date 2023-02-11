@@ -6,9 +6,9 @@
 //
 
 public struct CombinedLoadStates {
-    let refresh: LoadState
+    public let refresh: LoadState
     
-    let prepend: LoadState
+    public let prepend: LoadState
     
-    let append: LoadState
+    public let append: LoadState
 }
