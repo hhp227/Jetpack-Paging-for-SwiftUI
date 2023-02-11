@@ -48,7 +48,7 @@ public class LazyPagingItems<T : Any>: ObservableObject, DifferCallback {
         pagingDataDiffer.refresh()
     }
     
-    @Published private(set) var loadState: CombinedLoadStates = CombinedLoadStates(
+    @Published public private(set) var loadState: CombinedLoadStates = CombinedLoadStates(
         refresh: InitialLoadStates.refresh,
         prepend: InitialLoadStates.prepend,
         append: InitialLoadStates.append
