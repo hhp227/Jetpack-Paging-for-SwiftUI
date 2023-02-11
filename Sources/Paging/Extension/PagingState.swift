@@ -8,7 +8,7 @@
 public class PagingState<Key : Any, Value : Any> {
     let pages: [PagingSource<Key, Value>.LoadResult<Key, Value>.Page<Key, Value>]
     
-    let anchorPosition: Int?
+    public let anchorPosition: Int?
     
     private let leadingPlaceholderCount: Int
     
@@ -30,7 +30,7 @@ public class PagingState<Key : Any, Value : Any> {
         }
     }
     
-    func closestPageToPosition(_ anchorPosition: Int) -> PagingSource<Key, Value>.LoadResult<Key, Value>.Page<Key, Value>? {
+    public func closestPageToPosition(_ anchorPosition: Int) -> PagingSource<Key, Value>.LoadResult<Key, Value>.Page<Key, Value>? {
         if pages.all(predicate: { $0.data.isEmpty }) {
             return nil
         }

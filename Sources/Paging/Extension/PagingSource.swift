@@ -61,7 +61,7 @@ open class PagingSource<Key: Any, Value: Any> {
             }
         }
         
-        func getKey() -> Key? {
+        public func getKey() -> Key? {
             abort()
         }
         
@@ -83,7 +83,8 @@ open class PagingSource<Key: Any, Value: Any> {
     }
     
     open class LoadResult<Key: Any, Value: Any> {
-        class Error<Key: Any, Value: Any>: LoadResult<Key, Value> {
+        
+        public class Error<Key: Any, Value: Any>: LoadResult<Key, Value> {
             var error: Swift.Error
             
             init(error: Swift.Error) {
@@ -93,18 +94,19 @@ open class PagingSource<Key: Any, Value: Any> {
         
         class Invalid<Key: Any, Value: Any>: LoadResult<Key, Value> {}
         
-        class Page<Key: Any, Value: Any>: LoadResult<Key, Value> {
+        public class Page<Key: Any, Value: Any>: LoadResult<Key, Value> {
+            
             let data: [Value]
             
-            let prevKey: Key?
+            public let prevKey: Key?
             
-            let nextKey: Key?
+            public let nextKey: Key?
             
             let itemsBefore: Int = Int.min
             
             let itemsAfter: Int = Int.min
             
-            init(data: [Value], prevKey: Key?, nextKey: Key?) {
+            public init(data: [Value], prevKey: Key?, nextKey: Key?) {
                 self.data = data
                 self.prevKey = prevKey
                 self.nextKey = nextKey

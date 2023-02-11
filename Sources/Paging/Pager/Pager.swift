@@ -8,7 +8,7 @@
 import Combine
 
 public class Pager<Key: Equatable, Value: Any> {
-    let publisher: AnyPublisher<PagingData<Value>, Never>
+    public let publisher: AnyPublisher<PagingData<Value>, Never>
     
     public init(_ config: PagingConfig, _ initialKey: Key? = nil, _ pagingSourceFactory: @escaping () -> PagingSource<Key, Value>) {
         self.publisher = PageFetcher(pagingSourceFactory, initialKey, config).publisher
