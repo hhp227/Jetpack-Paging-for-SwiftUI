@@ -9,6 +9,7 @@ import Accessibility
 
 // 애매하지만 완료
 open class PagingSource<Key: Any, Value: Any> {
+    
     private let invalidateCallbackTracker = InvalidateCallbackTracker(
         callbackInvoker: { $0() }
     )
@@ -138,11 +139,11 @@ open class PagingSource<Key: Any, Value: Any> {
         invalidateCallbackTracker.unregisterInvalidatedCallback(callback: onInvalidatedCallback)
     }
     
-    func load(params: LoadParams<Key>) async -> LoadResult<Key, Value> {
+    open func load(params: LoadParams<Key>) async -> LoadResult<Key, Value> {
         abort()
     }
     
-    func getFreshKey(state: PagingState<Key, Value>) -> Key? {
+    open func getFreshKey(state: PagingState<Key, Value>) -> Key? {
         abort()
     }
 }
