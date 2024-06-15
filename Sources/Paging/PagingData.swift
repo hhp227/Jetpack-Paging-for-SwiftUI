@@ -9,16 +9,16 @@ import Foundation
 import Combine
 
 public class PagingData<T: Any> {
-    internal let currentValueSubject: CurrentValueSubject<PageEvent<T>, Never>
-    
+    internal let publisher: AnyPublisher<PageEvent<T>, Never>
+
     internal let receiver: UiReceiver
     
-    static func empty<T: Any>() -> PagingData<T> {
-        return PagingData<T>(CurrentValueSubject<PageEvent<T>, Never>(PageEvent<T>.StaticList(data: [])), NoopReceiver())
+    static func empty() -> PagingData<T> {
+        return PagingData<T>(CurrentValueSubject<PageEvent<T>, Never>(PageEvent<T>.StaticList(data: [])).eraseToAnyPublisher(), NoopReceiver())
     }
     
-    init(_ currentValueSubject: CurrentValueSubject<PageEvent<T>, Never>, _ uiReceiver: UiReceiver) {
-        self.currentValueSubject = currentValueSubject
+    init(_ publisher: AnyPublisher<PageEvent<T>, Never>, _ uiReceiver: UiReceiver) {
+        self.publisher = publisher
         self.receiver = uiReceiver
     }
     
@@ -30,3 +30,4 @@ public class PagingData<T: Any> {
         func refresh() {}
     }
 }
+

@@ -7,8 +7,11 @@
 
 import Foundation
 
-enum LoadType {
-    case REFRESH
-    case PREPEND
-    case APPEND
+public enum LoadType: CaseIterable {
+    var ordinal: Int {
+        return LoadType.allCases.firstIndex(of: self) ?? -1
+    }
+    case refresh
+    case prepend
+    case append
 }

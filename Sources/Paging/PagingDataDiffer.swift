@@ -49,10 +49,9 @@ class PagingDataDiffer<T: Any>: ProcessPageEventCallback {
     func collectFrom(_ pagingData: PagingData<T>) {
         receiver = pagingData.receiver
         
-        pagingData.currentValueSubject.sink { event in
+        pagingData.publisher.sink { event in
             DispatchQueue.main.async {
-                print("event: \(event)")
-                if let event = event as? PageEvent<T>.Insert<T>, event.loadType == LoadType.REFRESH {
+                if let event = event as? PageEvent<T>.Insert<T>, event.loadType == .refresh {
                     self.presentNewList(
                         pages: event.pages,
                         placeholdersBefore: event.placeholdersBefore,
@@ -78,8 +77,8 @@ class PagingDataDiffer<T: Any>: ProcessPageEventCallback {
                     if let event = event as? PageEvent<T>.Insert<T> {
                         let prependDone = self.combinedLoadStatesCollection.source.prepend.endOfPaginationReached
                         let appendDone = self.combinedLoadStatesCollection.source.append.endOfPaginationReached
-                        let canContinueLoading = !(event.loadType == .PREPEND && prependDone) && !(event.loadType == .APPEND && appendDone)
-                        let emptyInsert = event.pages.all(predicate: { $0.data.isEmpty })
+                        let canContinueLoading = !(event.loadType == .prepend && prependDone) && !(event.loadType == .append && appendDone)
+                        let emptyInsert = event.pages.allSatisfy { $0.data.isEmpty }
                         
                         if !canContinueLoading {
                             self.lastAccessedIndexUnfulfilled = false
@@ -111,6 +110,10 @@ class PagingDataDiffer<T: Any>: ProcessPageEventCallback {
             viewportHint: presenter.accessHintForPresenterIndex(index)
         )
         return presenter.get(index)
+    }
+    
+    subscript(index: Int) -> T? {
+        return get(index: index)
     }
     
     func peek(index: Int) -> T? {

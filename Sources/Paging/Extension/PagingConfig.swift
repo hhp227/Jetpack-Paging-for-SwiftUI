@@ -7,33 +7,40 @@
 
 import Foundation
 
-// 완료
 public class PagingConfig {
-    let pageSize: Int
+    public let pageSize: Int
     
-    let prefetchDistance: Int
+    public let prefetchDistance: Int
     
-    let enablePlaceholders: Bool = true
+    public let enablePlaceholders: Bool
     
-    let initialLoadSize: Int
+    public let initialLoadSize: Int
     
-    let maxSize: Int = MAX_SIZE_UNBOUNDED
+    public let maxSize: Int = MAX_SIZE_UNBOUNDED
     
-    let jumpThreshold: Int = Int.min
+    public let jumpThreshold: Int = Int.min
     
-    static let MAX_SIZE_UNBOUNDED = Int.max
+    public static let MAX_SIZE_UNBOUNDED = Int.max
     
     internal static let DEFAULT_INITIAL_PAGE_MULTIPLIER = 3
     
-    public init(pageSize: Int) {
+    public init(
+        pageSize: Int,
+        prefetchDistance: Int? = nil,
+        enablePlaceholders: Bool = true,
+        initialLoadSize: Int? = nil,
+        maxSize: Int = PagingConfig.MAX_SIZE_UNBOUNDED,
+        jumpThreshold: Int = Int.min
+    ) {
         self.pageSize = pageSize
-        self.prefetchDistance = self.pageSize
-        self.initialLoadSize = self.pageSize * PagingConfig.DEFAULT_INITIAL_PAGE_MULTIPLIER
+        self.prefetchDistance = prefetchDistance ?? pageSize
+        self.enablePlaceholders = enablePlaceholders
+        self.initialLoadSize = initialLoadSize ?? self.pageSize * PagingConfig.DEFAULT_INITIAL_PAGE_MULTIPLIER
         
         if !enablePlaceholders && prefetchDistance == 0 {
             fatalError("Placeholders and prefetch are the only ways to trigger loading of more data in PagingData, so either placeholders must be enabled, or prefetch distance must be > 0")
         }
-        if maxSize != PagingConfig.MAX_SIZE_UNBOUNDED && maxSize < pageSize + prefetchDistance * 2 {
+        if maxSize != PagingConfig.MAX_SIZE_UNBOUNDED && maxSize < pageSize + self.prefetchDistance * 2 {
             fatalError("jumpThreshold must be positive to enable jumps or COUNT_UNDEFINED to disable jumping.")
         }
         guard jumpThreshold == Int.min || jumpThreshold > 0 else {

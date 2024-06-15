@@ -9,14 +9,22 @@ import Foundation
 import Combine
 import SwiftUI
 
-// 애매하지만 완료
+// TODO input값이 사용되지 않고 있음
 internal class PageFetcherSnapshot<Key: Equatable, Value: Any> {
     internal let initialKey: Key?
     
     internal let pagingSource: PagingSource<Key, Value>
     
     private let config: PagingConfig
-    
+
+    private let retryPublisher: AnyPublisher<Void, Never>
+
+    private let triggerRemoteRefresh: Bool
+
+    let remoteMediatorConnection: (any RemoteMediatorConnection)?
+
+    private let previousPagingState: PagingState<Key, Value>?
+
     private let invalidate: () -> Void
     
     private let hintHandler = HintHandler()
@@ -45,7 +53,7 @@ internal class PageFetcherSnapshot<Key: Equatable, Value: Any> {
     
     private func startConsumingHints() {
         if config.jumpThreshold != Int.min {
-            [LoadType.APPEND, LoadType.PREPEND]
+            [.append, .prepend]
                 .forEach { loadType in
                     self.hintHandler.hintFor(loadType)
                         .filter { hint in
@@ -57,11 +65,11 @@ internal class PageFetcherSnapshot<Key: Equatable, Value: Any> {
         }
         self.collectAsGenerationalViewportHints(
             self.stateHolder.withLock { state in state.consumePrependGenerationIdAsPublisher() },
-            .PREPEND
+            .prepend
         )
         self.collectAsGenerationalViewportHints(
             self.stateHolder.withLock { state in state.consumeAppendGenerationIdAsPublisher() },
-            .APPEND
+            .append
         )
     }
     
@@ -93,39 +101,39 @@ internal class PageFetcherSnapshot<Key: Equatable, Value: Any> {
         return PagingSource<Key, Value>.LoadParams<Key>.create(
             loadType,
             key,
-            loadType == .REFRESH ? config.initialLoadSize : config.pageSize,
+            loadType == .refresh ? config.initialLoadSize : config.pageSize,
             config.enablePlaceholders
         )
     }
     
     private func doInitialLoad() async {
-        stateHolder.withLock { state in state.setLoading(.REFRESH, pageEvent) }
+        stateHolder.withLock { state in state.setLoading(.refresh, pageEvent) }
         
-        let params = loadParams(.REFRESH, initialKey)
+        let params = loadParams(.refresh, initialKey)
         
         switch await pagingSource.load(params: params) {
         case let result as PagingSource<Key, Value>.LoadResult<Key, Value>.Page<Key, Value>:
             let insertApplied = stateHolder.withLock { state -> Bool in
-                state.sourceLoadStates.set(.REFRESH, .NotLoading(false))
+                state.sourceLoadStates.set(.refresh, .NotLoading(false))
                 if result.prevKey == nil {
-                    state.sourceLoadStates.set(.PREPEND, .NotLoading(true))
+                    state.sourceLoadStates.set(.prepend, .NotLoading(true))
                 }
                 if result.nextKey == nil {
-                    state.sourceLoadStates.set(.APPEND, .NotLoading(true))
+                    state.sourceLoadStates.set(.append, .NotLoading(true))
                 }
-                return state.insert(0, .REFRESH, page: result)
+                return state.insert(0, .refresh, page: result)
             }
             
             if insertApplied {
                 stateHolder.withLock { state in
-                    pageEvent.value = state.toPageEvent(.REFRESH, result)
+                    pageEvent.value = state.toPageEvent(.refresh, result)
                 }
             }
         case let result as PagingSource<Key, Value>.LoadResult<Key, Value>.Error<Key, Value>:
             stateHolder.withLock { state in
                 let loadState = LoadState.Error(result.error)
                 
-                state.setError(.REFRESH, loadState, pageEvent)
+                state.setError(.refresh, loadState, pageEvent)
             }
         case _ as PagingSource<Key, Value>.LoadResult<Key, Value>.Invalid<Key, Value>:
             onInvalidLoad()
@@ -135,14 +143,14 @@ internal class PageFetcherSnapshot<Key: Equatable, Value: Any> {
     }
     
     private func doLoad(_ loadType: LoadType, _ generationalHint: GenerationalViewportHint) async {
-        guard loadType != .REFRESH else {
+        guard loadType != .refresh else {
             fatalError("Use doInitalLoad for LoadType == REFRESH")
         }
         var itemsLoaded = 0
         
         stateHolder.withLock { state in
             switch loadType {
-            case .PREPEND:
+            case .prepend:
                 var firstPageIndex = state.initialPageIndex + generationalHint.hint.originalPageOffsetFirst - 1
                 
                 if firstPageIndex > state.pages.endIndex - 1 {
@@ -154,7 +162,7 @@ internal class PageFetcherSnapshot<Key: Equatable, Value: Any> {
                         itemsLoaded += state.pages[pageIndex].data.count
                     }
                 }
-            case .APPEND:
+            case .append:
                 var lastPageIndex = state.initialPageIndex + generationalHint.hint.originalPageOffsetLast + 1
                 
                 if lastPageIndex < 0 {
@@ -166,7 +174,7 @@ internal class PageFetcherSnapshot<Key: Equatable, Value: Any> {
                         itemsLoaded += state.pages[pageIndex].data.count
                     }
                 }
-            case .REFRESH:
+            case .refresh:
                 fatalError("Use doInitialLoad for LoadType == REFRESH")
             }
         }
@@ -198,16 +206,16 @@ internal class PageFetcherSnapshot<Key: Equatable, Value: Any> {
                     let nextKey: Key?
                     
                     switch loadType {
-                    case .REFRESH:
+                    case .refresh:
                         fatalError()
-                    case .PREPEND:
+                    case .prepend:
                         nextKey = result.prevKey
-                    case .APPEND:
+                    case .append:
                         nextKey = result.nextKey
                     }
                     
                     guard pagingSource.keyReuseSupported || nextKey != loadKey else {
-                        let keyFieldName = loadType == .PREPEND ? "prevKey" : "nextKey"
+                        let keyFieldName = loadType == .prepend ? "prevKey" : "nextKey"
                         fatalError(
                             "The same value, \(String(describing: loadKey)), was passed as the \(keyFieldName) in two | sequential Pages loaded from a PagingSource. Re-using load keys in | PagingSource is often an error, and must be explicitly enabled by | overriding PagingSource.keyReuseSupported."
                         )
@@ -223,7 +231,7 @@ internal class PageFetcherSnapshot<Key: Equatable, Value: Any> {
                     
                     itemsLoaded += result.data.count
                     
-                    if (loadType == .PREPEND && result.prevKey == nil) || (loadType == .APPEND && result.nextKey == nil) {
+                    if (loadType == .prepend && result.prevKey == nil) || (loadType == .append && result.nextKey == nil) {
                         endOfPaginationReached = true
                     }
                 case let result as PagingSource<Key, Value>.LoadResult<Key, Value>.Error<Key, Value>:
@@ -273,11 +281,19 @@ internal class PageFetcherSnapshot<Key: Equatable, Value: Any> {
         initialKey: Key?,
         pagingSource: PagingSource<Key, Value>,
         config: PagingConfig,
+        retryPublisher: AnyPublisher<Void, Never>,
+        triggerRemoteRefresh: Bool = false,
+        remoteMediatorConnection: (some RemoteMediatorConnection)? = nil,
+        previousPagingState: PagingState<Key, Value>? = nil,
         invalidate: @escaping () -> Void = {}
     ) {
         self.initialKey = initialKey
         self.pagingSource = pagingSource
         self.config = config
+        self.retryPublisher = retryPublisher
+        self.triggerRemoteRefresh = triggerRemoteRefresh
+        self.remoteMediatorConnection = remoteMediatorConnection
+        self.previousPagingState = previousPagingState
         self.invalidate = invalidate
         self.stateHolder = PageFetcherSnapshotState<Key, Value>.Holder<Key, Value>(config: self.config)
         self.pageEventSubject = CurrentValueSubject<PageEvent<Value>, Never>(pageEvent.value)
@@ -290,7 +306,7 @@ internal class PageFetcherSnapshot<Key: Equatable, Value: Any> {
         }.store(in: &self.subscriptions)
         Task {
             await self.doInitialLoad()
-            if !(self.stateHolder.withLock(block: { state in state.sourceLoadStates.get(.REFRESH) }) is LoadState.Error) { // TODO 여기가 이상함
+            if !(self.stateHolder.withLock(block: { state in state.sourceLoadStates.get(.refresh) }) is LoadState.Error) { // TODO 여기가 이상함
                 self.startConsumingHints()
             }
         }
@@ -327,7 +343,7 @@ private extension PageFetcherSnapshotState {
         if presentedItemsBeyondAnchor >= config.prefetchDistance {
             return nil
         }
-        return loadType == .PREPEND ? pages.first?.prevKey : pages.last?.nextKey
+        return loadType == .prepend ? pages.first?.prevKey : pages.last?.nextKey
     }
 }
 

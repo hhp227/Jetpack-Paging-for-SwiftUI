@@ -14,22 +14,22 @@ internal class MutableLoadStateCollection {
     
     func get(_ loadType: LoadType) -> LoadState {
         switch loadType {
-        case .REFRESH:
+        case .refresh:
             return refresh
-        case .APPEND:
+        case .append:
             return append
-        case .PREPEND:
+        case .prepend:
             return prepend
         }
     }
     
     func set(_ type: LoadType, _ state: LoadState) {
         switch type {
-        case .REFRESH:
+        case .refresh:
             refresh = state
-        case .APPEND:
+        case .append:
             append = state
-        case .PREPEND:
+        case .prepend:
             prepend = state
         }
     }
