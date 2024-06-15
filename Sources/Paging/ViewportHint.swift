@@ -16,11 +16,11 @@ class ViewportHint: Equatable {
     
     func presentedItemsBeyondAnchor(_ loadType: LoadType) -> Int {
         switch loadType {
-        case .REFRESH:
+        case .refresh:
             fatalError("Cannot get presentedItems for loadType: REFRESH")
-        case .PREPEND:
+        case .prepend:
             return presentedItemsBefore
-        case .APPEND:
+        case .append:
             return presentedItemsAfter
         }
     }

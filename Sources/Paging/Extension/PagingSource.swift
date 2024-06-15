@@ -7,13 +7,7 @@
 
 import Accessibility
 
-// 애매하지만 완료
 open class PagingSource<Key: Any, Value: Any> {
-    
-    public init() {
-        
-    }
-    
     private let invalidateCallbackTracker = InvalidateCallbackTracker(
         callbackInvoker: { $0() }
     )
@@ -72,11 +66,11 @@ open class PagingSource<Key: Any, Value: Any> {
         
         static func create(_ loadType: LoadType, _ key: Key?, _ loadSize: Int, _ placeholdersEnabled: Bool) -> LoadParams<Key> {
             switch loadType {
-            case .REFRESH:
+            case .refresh:
                 return Refresh(key, loadSize, placeholdersEnabled)
-            case .PREPEND:
+            case .prepend:
                 return Prepend(key!, loadSize, placeholdersEnabled)
-            case .APPEND:
+            case .append:
                 return Append(key!, loadSize, placeholdersEnabled)
             }
         }
@@ -88,7 +82,6 @@ open class PagingSource<Key: Any, Value: Any> {
     }
     
     open class LoadResult<Key: Any, Value: Any> {
-        
         public class Error<Key: Any, Value: Any>: LoadResult<Key, Value> {
             var error: Swift.Error
             
@@ -100,7 +93,6 @@ open class PagingSource<Key: Any, Value: Any> {
         class Invalid<Key: Any, Value: Any>: LoadResult<Key, Value> {}
         
         public class Page<Key: Any, Value: Any>: LoadResult<Key, Value> {
-            
             let data: [Value]
             
             public let prevKey: Key?
@@ -147,7 +139,9 @@ open class PagingSource<Key: Any, Value: Any> {
         abort()
     }
     
-    open func getFreshKey(state: PagingState<Key, Value>) -> Key? {
+    open func getRefreshKey(state: PagingState<Key, Value>) -> Key? {
         abort()
     }
+    
+    public init() {}
 }

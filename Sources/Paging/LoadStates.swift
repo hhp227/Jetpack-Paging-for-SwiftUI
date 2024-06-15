@@ -16,22 +16,22 @@ class LoadStates : Equatable {
     
     func modifyState(_ loadType: LoadType, _ newState: LoadState) -> LoadStates {
         switch loadType {
-        case .REFRESH:
+        case .refresh:
             return LoadStates(newState, self.prepend, self.append)
-        case .PREPEND:
+        case .prepend:
             return LoadStates(self.refresh, newState, self.append)
-        case .APPEND:
+        case .append:
             return LoadStates(self.refresh, self.prepend, newState)
         }
     }
     
     func get(_ loadType: LoadType) -> LoadState {
         switch loadType {
-        case .REFRESH:
+        case .refresh:
             return self.refresh
-        case .PREPEND:
+        case .prepend:
             return self.prepend
-        case .APPEND:
+        case .append:
             return self.append
         }
     }

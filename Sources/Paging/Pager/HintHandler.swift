@@ -18,9 +18,9 @@ internal class HintHandler {
 
     func hintFor(_ loadType: LoadType) -> AnyPublisher<ViewportHint, Never> {
         switch loadType {
-        case .PREPEND:
+        case .prepend:
             return state.prependPublisher
-        case .APPEND:
+        case .append:
             return state.appendPublisher
         default:
             fatalError("invalid load type for hints")
@@ -28,11 +28,11 @@ internal class HintHandler {
     }
     
     func forceSetHint(_ loadType: LoadType, _ viewPortHint: ViewportHint) {
-        guard loadType == .PREPEND || loadType == .APPEND else {
+        guard loadType == .prepend || loadType == .append else {
             fatalError("invalid load type for reset: \(loadType)")
         }
         state.modify(nil) { prependHint, appendHint in
-            if loadType == .PREPEND {
+            if loadType == .prepend {
                 prependHint.value = viewPortHint
             } else {
                 appendHint.value = viewPortHint
@@ -44,13 +44,13 @@ internal class HintHandler {
         state.modify(viewportHint as? ViewportHint.Access) { prependHint, appendHint in
             if viewportHint.shouldPrioritizeOver(
                 previous: prependHint.value,
-                loadType: .PREPEND
+                loadType: .prepend
             ) {
                 prependHint.value = viewportHint
             }
             if viewportHint.shouldPrioritizeOver(
                 previous: appendHint.value,
-                loadType: .APPEND
+                loadType: .append
             ) {
                 appendHint.value = viewportHint
             }
