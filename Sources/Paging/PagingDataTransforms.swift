@@ -13,7 +13,7 @@ extension PagingData {
         return PagingData(publisher.map { transform($0) }.upstream, receiver)
     }
     
-    func filter(_ predicate: @escaping (T) -> Bool) -> PagingData<T> {
+    public func filter(_ predicate: @escaping (T) -> Bool) -> PagingData<T> {
         return transform { $0.filter(predicate) }
     }
 }
