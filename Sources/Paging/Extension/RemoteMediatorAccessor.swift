@@ -177,7 +177,9 @@ private class RemoteMediatorAccessImpl<Key: Any, Value: Any>: RemoteMediatorAcce
             let loadResult = remoteMediator.load(loadType: .refresh, state: pendingPagingState)
 
             switch (loadResult) {
+
             case .success(let endOfPaginationReached):
+
                 accessorState.use {
                     $0.clearPendingRequest(loadType: .refresh)
                     if endOfPaginationReached {
@@ -194,7 +196,9 @@ private class RemoteMediatorAccessImpl<Key: Any, Value: Any>: RemoteMediatorAcce
                     return $0.getPendingBoundary() != nil
                 }
                 break
+
             case .error(let e):
+
                 accessorState.use {
                     $0.clearPendingRequest(loadType: .refresh)
                     $0.setError(loadType: .refresh, errorState: LoadState.Error(e))
@@ -216,7 +220,9 @@ private class RemoteMediatorAccessImpl<Key: Any, Value: Any>: RemoteMediatorAcce
                 break
             }
             switch remoteMediator.load(loadType: loadType, state: pendingPagingState) {
+
             case .success(endOfPaginationReached: let endOfPaginationReached):
+
                 accessorState.use {
                     $0.clearPendingRequest(loadType: loadType)
                     if endOfPaginationReached {
@@ -224,7 +230,9 @@ private class RemoteMediatorAccessImpl<Key: Any, Value: Any>: RemoteMediatorAcce
                     }
                 }
                 break
+
             case .error(let e):
+
                 accessorState.use {
                     $0.clearPendingRequest(loadType: loadType)
                     $0.setError(loadType: loadType, errorState: LoadState.Error(e))
@@ -267,7 +275,9 @@ private class RemoteMediatorAccessImpl<Key: Any, Value: Any>: RemoteMediatorAcce
     func initialize() -> RemoteMediator<Key, Value>.InitializeAction {
         let action = remoteMediator.initialize()
 
+
         if action == RemoteMediator.InitializeAction.launchInitialRefresh {
+
             accessorState.use {
                 $0.setBlockState(loadType: .append, state: .requiresRefresh)
                 $0.setBlockState(loadType: .prepend, state: .requiresRefresh)
