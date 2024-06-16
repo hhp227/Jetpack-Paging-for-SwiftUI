@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import UIKit
 import Combine
 
 internal class PageFetcherSnapshotState<Key: Any, Value: Any> {

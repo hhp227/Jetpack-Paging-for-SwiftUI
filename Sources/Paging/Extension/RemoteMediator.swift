@@ -12,15 +12,15 @@ open class RemoteMediator<Key: Any, Value: Any> {
         abort()
     }
     
-    open func initialize() -> InitializeAction { .LAUNCH_INITIAL_REFRESH }
+    open func initialize() -> InitializeAction { .launchInitialRefresh }
     
     public enum MediatorResult {
-        case Error(Error)
-        case Success(endOfPaginationReached: Bool)
+        case error(Error)
+        case success(endOfPaginationReached: Bool)
     }
     
     public enum InitializeAction {
-        case LAUNCH_INITIAL_REFRESH
-        case SKIP_INITIAL_REFRESH
+        case launchInitialRefresh
+        case skipInitialRefresh
     }
 }

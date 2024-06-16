@@ -25,7 +25,9 @@ internal class PageFetcher<Key: Equatable, Value: Any> {
             let remoteMediatorAccessor = remoteMediator != nil ? remoteMediatorAccessor(delegate: remoteMediator!) : nil
             let initialValue: GenerationInfo<Key, Value>? = nil
             return refreshEvents.publisher
-                .prepend(remoteMediatorAccessor?.initialize() == .LAUNCH_INITIAL_REFRESH)
+
+                .prepend(remoteMediatorAccessor?.initialize() == .launchInitialRefresh)
+
                 .scan(initialValue) { previousGeneration, triggerRemoteRefresh in
                     let pagingSource = self.generateNewPagingSource(previousGeneration?.snapshot.pagingSource)
                     var previousPagingState = previousGeneration?.snapshot.currentPagingState()
