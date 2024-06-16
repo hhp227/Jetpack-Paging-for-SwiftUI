@@ -120,9 +120,9 @@ internal class PagePresenter<T: Any>: NullPaddedList {
         let oldCount = size
         
         switch insert.loadType {
-        case .REFRESH:
+        case .refresh:
             fatalError()
-        case .PREPEND:
+        case .prepend:
             let placeholdersChangedCount = min(placeholdersBefore, count)
             let placeholdersChangedPos = placeholdersBefore - placeholdersChangedCount
             let itemsInsertedCount = count - placeholdersChangedCount
@@ -141,7 +141,7 @@ internal class PagePresenter<T: Any>: NullPaddedList {
             } else if placeholderInsertedCount < 0 {
                 callback.onRemoved(position: 0, count: -placeholderInsertedCount)
             }
-        case .APPEND:
+        case .append:
             let placeholdersChangedCount = min(placeholdersAfter, count)
             let placeholdersChangesPos = placeholdersBefore + storageCount
             let itemsInsertedCount = count - placeholdersChangedCount
@@ -172,7 +172,7 @@ internal class PagePresenter<T: Any>: NullPaddedList {
         let pageEnumerated = pages.enumerated()
         
         for (index, page) in pageEnumerated {
-            if page.originalPageOffsets.any(predicate: { pageOffsetsToDrop.contains($0) }) {
+            if page.originalPageOffsets.contains(where: { pageOffsetsToDrop.contains($0) }) {
                 removeCount += page.data.count
                 pages.remove(at: index)
             }
@@ -183,7 +183,7 @@ internal class PagePresenter<T: Any>: NullPaddedList {
     private func dropPage(_ drop: PageEvent<T>.Drop<T>, _ callback: ProcessPageEventCallback) {
         let oldCount = size
         
-        if drop.loadType == .PREPEND {
+        if drop.loadType == .prepend {
             let oldPlaceholdersBefore = placeholdersBefore
             let itemDropCount = dropPagesWithOffsets(drop.minPageOffset...drop.maxPageOffset)
             storageCount -= itemDropCount
@@ -203,7 +203,7 @@ internal class PagePresenter<T: Any>: NullPaddedList {
                 callback.onChanged(position: firstItemIndex, count: changeCount)
             }
             callback.onStateUpdate(
-                loadType: .PREPEND,
+                loadType: .prepend,
                 fromMediator: false,
                 loadState: .NotLoading(false)
             )
@@ -227,7 +227,7 @@ internal class PagePresenter<T: Any>: NullPaddedList {
                 callback.onChanged(position: size - drop.placeholdersRemaining, count: changeCount)
             }
             callback.onStateUpdate(
-                loadType: .APPEND,
+                loadType: .append,
                 fromMediator: false,
                 loadState: .NotLoading(false)
             )

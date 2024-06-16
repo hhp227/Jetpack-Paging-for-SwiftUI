@@ -5,8 +5,6 @@
 //  Created by 홍희표 on 2022/06/26.
 //
 
-import Foundation
-
 open class PageEvent<T: Any> {
     class StaticList<T: Any>: PageEvent<T> {
         let data: [T]
@@ -35,6 +33,73 @@ open class PageEvent<T: Any> {
         
         var mediatorLoadStates: LoadStates? = nil
         
+        private func mapPages<R: Any>(_ transform: @escaping (TransformablePage<T>) -> TransformablePage<R>) -> Insert<R> {
+            return transformPages { pages in
+                pages.map(transform)
+            }
+        }
+        
+        internal func transformPages<R: Any>(_ transform: @escaping ([TransformablePage<T>]) -> [TransformablePage<R>]) -> Insert<R> {
+            return Insert<R>(
+                loadType: loadType,
+                pages: transform(pages),
+                placeholdersBefore: placeholdersBefore,
+                placeholdersAfter: placeholdersAfter,
+                sourceLoadStates: sourceLoadStates,
+                mediatorLoadStates: mediatorLoadStates
+            )
+        }
+        
+        override func map<R>(_ transform: @escaping (T) -> R) -> PageEvent<R> {
+            return mapPages {
+                TransformablePage(
+                    originalPageOffsets: $0.originalPageOffsets,
+                    data: $0.data.map(transform),
+                    hintOriginalPageOffset: $0.hintOriginalPageOffset,
+                    hintOriginalIndices: $0.hintOriginalIndices
+                )
+            }
+        }
+        
+        override func flatMap<R>(_ transform: @escaping (T) -> [R]) -> PageEvent<R> {
+            return mapPages { transformPage in
+                var data = [R]()
+                var originalIndices = [Int]()
+                transformPage.data.enumerated().forEach { (offset, element) in
+                    data.append(contentsOf: transform(element))
+                    let indexToStore = transformPage.hintOriginalIndices?[offset] ?? offset
+                    while originalIndices.count < data.count {
+                        originalIndices.append(indexToStore)
+                    }
+                }
+                return TransformablePage(
+                    originalPageOffsets: transformPage.originalPageOffsets,
+                    data: data,
+                    hintOriginalPageOffset: transformPage.hintOriginalPageOffset,
+                    hintOriginalIndices: originalIndices
+                )
+            }
+        }
+        
+        override func filter(_ predicate: @escaping (T) -> Bool) -> PageEvent<T> {
+            return mapPages { transformPage in
+                var data = [T]()
+                var originalIndices = [Int]()
+                transformPage.data.enumerated().forEach { (index, t) in
+                    if predicate(t) {
+                        data.append(t)
+                        originalIndices.append(transformPage.hintOriginalIndices?[index] ?? index)
+                    }
+                }
+                return TransformablePage(
+                    originalPageOffsets: transformPage.originalPageOffsets,
+                    data: data,
+                    hintOriginalPageOffset: transformPage.hintOriginalPageOffset,
+                    hintOriginalIndices: originalIndices
+                )
+            }
+        }
+        
         static func Refresh(
             pages: [TransformablePage<T>],
             placeholdersBefore: Int,
@@ -43,7 +108,7 @@ open class PageEvent<T: Any> {
             mediatorLoadStates: LoadStates? = nil
         ) -> Insert {
             return Insert(
-                loadType: LoadType.REFRESH,
+                loadType: .refresh,
                 pages: pages,
                 placeholdersBefore: placeholdersBefore,
                 placeholdersAfter: placeholdersAfter,
@@ -59,7 +124,7 @@ open class PageEvent<T: Any> {
             mediatorLoadStates: LoadStates? = nil
         ) -> Insert {
             return Insert(
-                loadType: LoadType.PREPEND,
+                loadType: .prepend,
                 pages: pages,
                 placeholdersBefore: placeholdersBefore,
                 placeholdersAfter: -1,
@@ -75,7 +140,7 @@ open class PageEvent<T: Any> {
             mediatorLoadStates: LoadStates? = nil
         ) -> Insert {
             return Insert(
-                loadType: LoadType.APPEND,
+                loadType: .append,
                 pages: pages,
                 placeholdersBefore: -1,
                 placeholdersAfter: placeholdersAfter,
@@ -92,13 +157,13 @@ open class PageEvent<T: Any> {
             self.sourceLoadStates = sourceLoadStates
             self.mediatorLoadStates = mediatorLoadStates
             
-            guard loadType == .APPEND || placeholdersBefore >= 0 else {
+            guard loadType == .append || placeholdersBefore >= 0 else {
                 fatalError("Prepend insert defining placeholdersBefore must be > 0, but was \(placeholdersBefore)")
             }
-            guard loadType == .PREPEND || placeholdersAfter >= 0 else {
+            guard loadType == .prepend || placeholdersAfter >= 0 else {
                 fatalError("Append insert defining placeholdersAfter must be > 0, but was \(placeholdersAfter)")
             }
-            guard loadType == .REFRESH || !pages.isEmpty else {
+            guard loadType == .refresh || !pages.isEmpty else {
                 fatalError("Cannot create a REFRESH Insert event with no TransformablePages as this could permanently stall pagination. Note that this check does not prevent empty LoadResults and is instead usually an indication of an internal error in Paging itself.")
             }
         }
@@ -128,7 +193,7 @@ open class PageEvent<T: Any> {
             self.maxPageOffset = maxPageOffset
             self.placeholdersRemaining = placeholdersRemaining
             
-            guard loadType != .REFRESH else {
+            guard loadType != .refresh else {
                 fatalError("Drop load type must be PREPEND or APPEND")
             }
             
@@ -151,5 +216,17 @@ open class PageEvent<T: Any> {
             self.source = source
             self.mediator = mediator
         }
+    }
+    
+    open func map<R: Any>(_ transform: @escaping (T) -> R) -> PageEvent<R> {
+        return self as! PageEvent<R>
+    }
+    
+    open func flatMap<R: Any>(_ transform: @escaping (T) -> [R]) -> PageEvent<R> {
+        return self as! PageEvent<R>
+    }
+    
+    open func filter(_ predicate: @escaping (T) -> Bool) -> PageEvent<T> {
+        return self
     }
 }
