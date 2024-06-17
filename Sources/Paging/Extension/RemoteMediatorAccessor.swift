@@ -12,9 +12,13 @@ internal protocol RemoteMediatorConnection {
     associatedtype Key
     associatedtype Value
     
+    func requestRefreshIfAllowed(_ pagingState: PagingState<Key, Value>)
+    
     func requestLoad(_ loadType: LoadType, _ pagingState: PagingState<Key, Value>)
     
     func retryFailed(_ pagingState: PagingState<Key, Value>)
+    
+    func allowRefresh()
 }
 
 internal protocol RemoteMediatorAccessor: RemoteMediatorConnection {
@@ -44,12 +48,32 @@ private class AccessorStateHolder<Key, Value> {
             return result
         }
     }
+    
+    func requestLoad(
+        _ loadType: LoadType,
+        _ pagingState: PagingState<Key, Value>,
+        _ launchRefresh: @escaping () -> Void,
+        _ launchBoundary: @escaping () -> Void
+    ) {
+        let newRequest = use {
+            $0.append(loadType: loadType, pagingState: pagingState)
+        }
+        
+        if newRequest {
+            if loadType == .refresh {
+                launchRefresh()
+            } else {
+                launchBoundary()
+            }
+        }
+    }
 }
 
 private class AccessorState<Key, Value> {
     private var blockStates = Array(repeating: BlockState.unblocked, count: LoadType.allCases.count)
     private var errors = Array<LoadState.Error?>(repeating: nil, count: LoadType.allCases.count)
     private var pendingRequests = [PendingRequest<Key, Value>]()
+    var refreshAllowed: Bool = false
 
     func computeLoadStates() -> LoadStates {
         return LoadStates(
@@ -156,15 +180,21 @@ private class RemoteMediatorAccessImpl<Key: Any, Value: Any>: RemoteMediatorAcce
 
     private let accessorState = AccessorStateHolder<Key, Value>()
 
-    func requestLoad(_ loadType: LoadType, _ pagingState: PagingState<Key, Value>) {
-        let newRequest = accessorState.use { $0.append(loadType: loadType, pagingState: pagingState) }
-        if newRequest {
-            if loadType == .refresh {
-                launchRefresh()
-            } else {
-                launchBoundary()
+    func requestRefreshIfAllowed(_ pagingState: PagingState<Key, Value>) {
+        accessorState.use {
+            if $0.refreshAllowed {
+                $0.refreshAllowed = false
+                accessorState.requestLoad(.refresh, pagingState, launchRefresh, launchBoundary)
             }
         }
+    }
+    
+    func allowRefresh() {
+        accessorState.use { $0.refreshAllowed = true }
+    }
+    
+    func requestLoad(_ loadType: LoadType, _ pagingState: PagingState<Key, Value>) {
+        accessorState.requestLoad(loadType, pagingState, launchRefresh, launchBoundary)
     }
 
     private func launchRefresh() {
