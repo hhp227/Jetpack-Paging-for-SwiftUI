@@ -10,7 +10,7 @@ import Combine
 import SwiftUI
 
 public class LazyPagingItems<T : Any>: ObservableObject, DifferCallback {
-    private let publisher: AnyPublisher<PagingData<T>, Never>
+    private let publisher: any Publisher<PagingData<T>, Never>
     
     @Published private(set) var itemSnapshotList = ItemSnapshotList<T>(0, 0, [])
     
@@ -80,14 +80,14 @@ public class LazyPagingItems<T : Any>: ObservableObject, DifferCallback {
         }
     }
     
-    init(_ publisher: AnyPublisher<PagingData<T>, Never>) {
+    init(_ publisher: any Publisher<PagingData<T>, Never>) {
         self.publisher = publisher
     }
 }
 
 private let InitialLoadStates = LoadStates(.Loading.instance, .NotLoading(false), .NotLoading(false))
 
-extension AnyPublisher where Failure == Never {
+extension Publisher where Failure == Never {
     public 
     func collectAsLazyPagingItems<T>() -> LazyPagingItems<T> where Output == PagingData<T> {
         @State var lazyPagingItems = LazyPagingItems(self)

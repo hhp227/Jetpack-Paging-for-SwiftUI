@@ -248,7 +248,7 @@ internal class PageFetcherSnapshotState<Key: Any, Value: Any> {
                 if let hint = viewportHint {
                     var anchorPosition = placeholdersBefore
                     let fetcherPageOffsetFirst = -initialPageIndex
-                    let fetcherPageOffsetLast = pages.endIndex - 1 - initialPageIndex
+                    let fetcherPageOffsetLast = (pages.endIndex - 1) - initialPageIndex
                     
                     for pageOffset in fetcherPageOffsetFirst..<hint.pageOffset {
                         anchorPosition += pageOffset > fetcherPageOffsetLast ? config.pageSize : pages[pageOffset + initialPageIndex].data.count
