@@ -108,7 +108,7 @@ final class PostListViewModel: ObservableObject {
     let pagingData: PagingData<Post>
 
     init() {
-        self.pagingData = pager.flow
+        self.pagingData = pager.publisher
     }
 }
 ```
