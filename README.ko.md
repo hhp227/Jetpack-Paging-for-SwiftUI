@@ -2,6 +2,13 @@
 
 > **Android Jetpack Paging3의 사고방식을 SwiftUI로 그대로 가져온 Pagination 라이브러리**
 
+## 🎬 샘플 앱
+
+이 라이브러리를 실제로 사용한 SwiftUI 샘플 앱입니다:
+
+👉 **Movie App (SwiftUI + Paging)**  
+https://github.com/hhp227study/Movie
+
 `Jetpack-Paging-for-SwiftUI`는 Android의 **Jetpack Paging3**에 익숙한 개발자가
 SwiftUI에서도 **동일한 개념·동일한 흐름·동일한 책임 분리**로 페이징을 구현할 수 있도록 만든 라이브러리입니다.
 
