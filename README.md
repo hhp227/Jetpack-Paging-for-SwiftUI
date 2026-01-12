@@ -1,6 +1,17 @@
 # Jetpack Paging for SwiftUI
 
+![platform](https://img.shields.io/badge/platform-iOS%20%7C%20SwiftUI-blue)
+![spm](https://img.shields.io/badge/SPM-compatible-success)
+![inspired](https://img.shields.io/badge/inspired%20by-Jetpack%20Paging3-brightgreen)
+
 > **Jetpack Paging3 mental model, brought to SwiftUI**
+
+## 🎬 Sample App
+
+A real SwiftUI sample app using this library:
+
+👉 **Movie App (SwiftUI + Paging)**  
+https://github.com/hhp227study/Movie
 
 `Jetpack-Paging-for-SwiftUI` is a pagination library that allows you to use **the same concepts, responsibilities, and data flow as Android Jetpack Paging3** in SwiftUI.
 
