@@ -8,9 +8,6 @@
 import Foundation
 
 internal protocol UiReceiver {
-    func accessHint(viewportHint: ViewportHint)
-    
     func retry()
-    
     func refresh()
 }

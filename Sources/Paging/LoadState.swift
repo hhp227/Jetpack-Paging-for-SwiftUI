@@ -28,13 +28,13 @@ open class LoadState: Equatable {
         return lhs.endOfPaginationReached == rhs.endOfPaginationReached
     }
     
-    public class NotLoading: LoadState {
+    class NotLoading: LoadState {
         override init(_ endOfPaginationReached: Bool) {
             super.init(endOfPaginationReached)
         }
     }
     
-    public class Loading: LoadState {
+    final class Loading: LoadState {
         static let instance = Loading()
         
         private init() {
@@ -42,7 +42,7 @@ open class LoadState: Equatable {
         }
     }
     
-    public class Error: LoadState {
+    class Error: LoadState {
         let error: Swift.Error
         
         init(_ error: Swift.Error) {
@@ -51,7 +51,7 @@ open class LoadState: Equatable {
         }
     }
     
-    public init(_ endOfPaginationReached: Bool) {
+    init(_ endOfPaginationReached: Bool) {
         self.endOfPaginationReached = endOfPaginationReached
     }
 }

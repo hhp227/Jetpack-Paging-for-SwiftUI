@@ -8,20 +8,22 @@
 import Foundation
 import Combine
 
-private class MulticastedPagingData<T: Any> {
+class MulticastedPagingData<T: Any> {
     let parent: PagingData<T>
 
     let tracker: ActivePublisherTracker?
 
-    private lazy var accumulated = CachedPageEventPublisher(
-        src: parent.publisher.handleEvents(
-            receiveSubscription: { _ in self.tracker?.onStart(publisherType: .pageEventPublisher) },
-            receiveCompletion: { _ in self.tracker?.onComplete(publisherType: .pageEventPublisher) }
-        ).eraseToAnyPublisher()
-    )
+    private var accumulated: CachedPageEventPublisher<T>
 
     func asPagingData() -> PagingData<T> {
-        return PagingData(accumulated.downstreamPublisher, parent.receiver)
+        return PagingData(
+            accumulated.downstreamPublisher.handleEvents(
+                receiveSubscription: { _ in self.tracker?.onStart(publisherType: .pageEventPublisher) },
+                receiveCompletion: { _ in self.tracker?.onComplete(publisherType: .pageEventPublisher) }
+            ).eraseToAnyPublisher(),
+            parent.receiver,
+            parent.hintReceiver
+        )
     }
     
     func close() {
@@ -31,17 +33,23 @@ private class MulticastedPagingData<T: Any> {
     init(parent: PagingData<T>, tracker: ActivePublisherTracker? = nil) {
         self.parent = parent
         self.tracker = tracker
+        self.accumulated = CachedPageEventPublisher(
+            src: parent.publisher
+        )
+        
+        tracker?.onNewCachedEventPublisher(accumulated)
     }
 }
 
 extension Publisher where Failure == Never {
 
-    public func cachedIn<T: Any>() -> AnyPublisher<PagingData<T>, Never> where Output == PagingData<T> {
+    func cachedIn<T: Any>() -> AnyPublisher<PagingData<T>, Never> where Output == PagingData<T> {
         return cachedIn(tracker: nil)
     }
     
     func cachedIn<T: Any>(tracker: ActivePublisherTracker?) -> AnyPublisher<PagingData<T>, Never> where Output == PagingData<T> {
-        return self.map { MulticastedPagingData(parent: $0) }
+        return self.map {
+            return MulticastedPagingData(parent: $0) }
             .runningReduce { (prev: MulticastedPagingData, next: MulticastedPagingData) in
                 prev.close()
                 return next
@@ -57,6 +65,7 @@ extension Publisher where Failure == Never {
 }
 
 internal protocol ActivePublisherTracker {
+    func onNewCachedEventPublisher<T>(_ cachedPageEventPublisher: CachedPageEventPublisher<T>)
     func onStart(publisherType: PublisherType)
     func onComplete(publisherType: PublisherType)
 }

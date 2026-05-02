@@ -13,9 +13,9 @@ internal protocol RemoteMediatorConnection {
     associatedtype Value
     
     func requestRefreshIfAllowed(_ pagingState: PagingState<Key, Value>)
-    
+
     func requestLoad(_ loadType: LoadType, _ pagingState: PagingState<Key, Value>)
-    
+
     func retryFailed(_ pagingState: PagingState<Key, Value>)
     
     func allowRefresh()
@@ -48,7 +48,7 @@ private class AccessorStateHolder<Key, Value> {
             return result
         }
     }
-    
+
     func requestLoad(
         _ loadType: LoadType,
         _ pagingState: PagingState<Key, Value>,
@@ -58,7 +58,7 @@ private class AccessorStateHolder<Key, Value> {
         let newRequest = use {
             $0.append(loadType: loadType, pagingState: pagingState)
         }
-        
+
         if newRequest {
             if loadType == .refresh {
                 launchRefresh()
@@ -78,15 +78,15 @@ private class AccessorState<Key, Value> {
     func computeLoadStates() -> LoadStates {
         return LoadStates(
             refresh: computeLoadTypeState(loadType: .refresh),
-            prepend: computeLoadTypeState(loadType: .prepend),
-            append: computeLoadTypeState(loadType: .append)
+            prepend: computeLoadTypeState(loadType: .append),
+            append: computeLoadTypeState(loadType: .prepend)
         )
     }
 
     private func computeLoadTypeState(loadType: LoadType) -> LoadState {
         let blockState = blockStates[loadType.ordinal]
         let hasPending = pendingRequests.contains { $0.loadType == loadType }
-        
+
         if hasPending && blockState != .requiresRefresh {
             return .Loading.instance
         }
@@ -188,11 +188,11 @@ private class RemoteMediatorAccessImpl<Key: Any, Value: Any>: RemoteMediatorAcce
             }
         }
     }
-    
+
     func allowRefresh() {
         accessorState.use { $0.refreshAllowed = true }
     }
-    
+
     func requestLoad(_ loadType: LoadType, _ pagingState: PagingState<Key, Value>) {
         accessorState.requestLoad(loadType, pagingState, launchRefresh, launchBoundary)
     }
@@ -224,6 +224,7 @@ private class RemoteMediatorAccessImpl<Key: Any, Value: Any>: RemoteMediatorAcce
                     return $0.getPendingBoundary() != nil
                 }
                 break
+
             case .error(let e):
                 launchAppendPrepend = accessorState.use {
                     $0.clearPendingRequest(loadType: .refresh)
@@ -246,9 +247,7 @@ private class RemoteMediatorAccessImpl<Key: Any, Value: Any>: RemoteMediatorAcce
                 break
             }
             switch remoteMediator.load(loadType: loadType, state: pendingPagingState) {
-
             case .success(endOfPaginationReached: let endOfPaginationReached):
-
                 accessorState.use {
                     $0.clearPendingRequest(loadType: loadType)
                     if endOfPaginationReached {
@@ -256,9 +255,7 @@ private class RemoteMediatorAccessImpl<Key: Any, Value: Any>: RemoteMediatorAcce
                     }
                 }
                 break
-
             case .error(let e):
-
                 accessorState.use {
                     $0.clearPendingRequest(loadType: loadType)
                     $0.setError(loadType: loadType, errorState: LoadState.Error(e))
@@ -300,7 +297,7 @@ private class RemoteMediatorAccessImpl<Key: Any, Value: Any>: RemoteMediatorAcce
 
     func initialize() -> RemoteMediator<Key, Value>.InitializeAction {
         let action = remoteMediator.initialize()
-
+        
         if action == RemoteMediator.InitializeAction.launchInitialRefresh {
             accessorState.use {
                 $0.setBlockState(loadType: .append, state: .requiresRefresh)

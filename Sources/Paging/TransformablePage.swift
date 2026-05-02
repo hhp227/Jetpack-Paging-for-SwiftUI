@@ -9,13 +9,13 @@ import Foundation
 
 struct TransformablePage<T: Any> {
     let originalPageOffsets: [Int]
-    
+
     let data: [T]
-    
+
     let hintOriginalPageOffset: Int
-    
+
     let hintOriginalIndices: [Int]?
-    
+
     func viewportHintFor(
         _ index: Int,
         _ presentedItemsBefore: Int,
@@ -32,17 +32,17 @@ struct TransformablePage<T: Any> {
             originalPageOffsetLast: originalPageOffsetLast
         )
     }
-    
+
     init(originalPageOffset: Int, data: [T]) {
         self.init(originalPageOffsets: [originalPageOffset], data: data, hintOriginalPageOffset: originalPageOffset, hintOriginalIndices: nil)
     }
-    
+
     init(originalPageOffsets: [Int], data: [T], hintOriginalPageOffset: Int, hintOriginalIndices: [Int]?) {
         self.originalPageOffsets = originalPageOffsets
         self.data = data
         self.hintOriginalPageOffset = hintOriginalPageOffset
         self.hintOriginalIndices = hintOriginalIndices
-        
+
         guard !originalPageOffsets.isEmpty else {
             fatalError("originalPageOffsets cannot be empty when constructing TranformablePage")
         }
@@ -50,13 +50,12 @@ struct TransformablePage<T: Any> {
             fatalError("If originalIndices (count = \(hintOriginalIndices!.count) is provided, it must be same length as data (count = \(data.count)")
         }
     }
-    
+
     static var EMPTY_INITIAL_PAGE: TransformablePage<T> {
         return TransformablePage<T>(originalPageOffset: 0, data: [])
     }
-    
+
     static func empty<T: Any>() -> TransformablePage<T> {
         return EMPTY_INITIAL_PAGE as! TransformablePage<T>
     }
 }
-

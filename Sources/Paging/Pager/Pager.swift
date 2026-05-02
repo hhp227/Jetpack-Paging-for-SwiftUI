@@ -7,23 +7,28 @@
 
 import Combine
 
-public class Pager<Key: Equatable, Value: Any> {
-    public let publisher: AnyPublisher<PagingData<Value>, Never>
+class Pager<Key: Equatable, Value: Any> {
+    let publisher: AnyPublisher<PagingData<Value>, Never>
     
-    public init(
-        config: PagingConfig,
-        initialKey: Key? = nil,
-        remoteMediator: RemoteMediator<Key, Value>?,
-        pagingSourceFactory: @escaping () -> PagingSource<Key, Value>
+    init(
+        _ config: PagingConfig,
+        _ initialKey: Key? = nil,
+        _ remoteMediator: RemoteMediator<Key, Value>?,
+        _ pagingSourceFactory: @escaping () -> PagingSource<Key, Value>
     ) {
-        self.publisher = PageFetcher(pagingSourceFactory, initialKey, config).publisher
+        self.publisher = PageFetcher(
+            pagingSourceFactory,
+            initialKey,
+            config,
+            remoteMediator
+        ).publisher
     }
-    
-    public convenience init(
-        config: PagingConfig,
-        initialKey: Key? = nil,
-        pagingSourceFactory: @escaping () -> PagingSource<Key, Value>
+
+    convenience init(
+        _ config: PagingConfig,
+        _ initialKey: Key? = nil,
+        _ pagingSourceFactory: @escaping () -> PagingSource<Key, Value>
     ) {
-        self.init(config: config, initialKey: initialKey, remoteMediator: nil, pagingSourceFactory: pagingSourceFactory)
+        self.init(config, initialKey, nil, pagingSourceFactory)
     }
 }

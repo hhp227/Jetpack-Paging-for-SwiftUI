@@ -41,7 +41,7 @@ internal class PageFetcher<Key: Equatable, Value: Any> {
                     }
                     
                     let initialKey: Key? = previousPagingState == nil ? self.initialKey : pagingSource.getRefreshKey(state: previousPagingState!)
-                    
+
                     previousGeneration?.snapshot.close()
                     return GenerationInfo(
                         snapshot: PageFetcherSnapshot(
@@ -49,7 +49,6 @@ internal class PageFetcher<Key: Equatable, Value: Any> {
                             pagingSource: pagingSource,
                             config: self.config,
                             retryPublisher: self.retryEvents.publisher,
-                            triggerRemoteRefresh: triggerRemoteRefresh,
                             remoteMediatorConnection: remoteMediatorAccessor,
                             previousPagingState: previousPagingState,
                             invalidate: self.refresh
@@ -60,8 +59,9 @@ internal class PageFetcher<Key: Equatable, Value: Any> {
                 .filter { $0 != nil }
                 .map { generation in
                     PagingData<Value>(
-                        generation!.snapshot.pageEventSubject.eraseToAnyPublisher(),
-                        PagerUiReceiver<Key, Value>(generation!.snapshot, self.retryEvents, self.refresh)
+                        generation!.snapshot.pageEventPublisher,
+                        PagerUiReceiver(self.retryEvents, self.refresh),
+                        PagerHintReceiver(generation!.snapshot)
                     )
                 }
                 .eraseToAnyPublisher()
@@ -73,7 +73,7 @@ internal class PageFetcher<Key: Equatable, Value: Any> {
     }
     
     private func invalidate() {
-        //refreshEvents.send(data: false)
+        refreshEvents.send(data: false)
     }
     
     private func generateNewPagingSource(_ previousPagingSource: PagingSource<Key, Value>?) -> PagingSource<Key, Value> {
@@ -82,6 +82,7 @@ internal class PageFetcher<Key: Equatable, Value: Any> {
             fatalError("An instance of PagingSource was re-used when Pager expected to create a new instance. Ensure that the pagingSourceFactory passed to Pager always returns a new instance of PagingSource")
         }
         
+        print("generateNewPagingSource")
         pagingSource.registerInvalidatedCallback(invalidate)
         previousPagingSource?.unregisterInvalidatedCallback(invalidate)
         previousPagingSource?.invalidate()
@@ -99,37 +100,38 @@ internal class PageFetcher<Key: Equatable, Value: Any> {
         self.config = config
         self.remoteMediator = remoteMediator
     }
-    
-    class PagerUiReceiver<Key: Equatable, Value: Any>: UiReceiver {
-        private let pageFetcherSnapshot: PageFetcherSnapshot<Key, Value>
 
+    class PagerUiReceiver: UiReceiver {
         private let retryEventBus: ConflatedEventBus<Void>
-        
-        private let refreshCallback: () -> Void
 
-        func accessHint(viewportHint: ViewportHint) {
-            pageFetcherSnapshot.accessHint(viewportHint)
-        }
+        private let refreshCallback: () -> Void
 
         func retry() {
             retryEventBus.send(data: ())
         }
-
+        
         func refresh() {
             refreshCallback()
         }
-
-        init(
-            _ pageFetcherSnapshot: PageFetcherSnapshot<Key, Value>,
-            _ retryEventBus: ConflatedEventBus<Void>,
-            _ refreshCallback: @escaping () -> Void
-        ) {
-            self.pageFetcherSnapshot = pageFetcherSnapshot
+        
+        init(_ retryEventBus: ConflatedEventBus<Void>, _ refreshCallback: @escaping () -> Void) {
             self.retryEventBus = retryEventBus
             self.refreshCallback = refreshCallback
         }
     }
-
+    
+    class PagerHintReceiver<Key: Equatable, Value: Any>: HintReceiver {
+        private let pageFetcherSnapshot: PageFetcherSnapshot<Key, Value>
+        
+        func accessHint(viewportHint: ViewportHint) {
+            pageFetcherSnapshot.accessHint(viewportHint)
+        }
+        
+        init(_ pageFetcherSnapshot: PageFetcherSnapshot<Key, Value>) {
+            self.pageFetcherSnapshot = pageFetcherSnapshot
+        }
+    }
+    
     private struct GenerationInfo<Key: Equatable, Value: Any> {
         let snapshot: PageFetcherSnapshot<Key, Value>
         

@@ -28,9 +28,6 @@ internal class HintHandler {
     }
     
     func forceSetHint(_ loadType: LoadType, _ viewPortHint: ViewportHint) {
-        guard loadType == .prepend || loadType == .append else {
-            fatalError("invalid load type for reset: \(loadType)")
-        }
         state.modify(nil) { prependHint, appendHint in
             if loadType == .prepend {
                 prependHint.value = viewPortHint
