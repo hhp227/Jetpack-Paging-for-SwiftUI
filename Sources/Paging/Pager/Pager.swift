@@ -7,7 +7,7 @@
 
 import Combine
 
-class Pager<Key: Equatable, Value: Any> {
+public class Pager<Key: Equatable, Value: Any> {
     let publisher: AnyPublisher<PagingData<Value>, Never>
     
     init(
