@@ -12,7 +12,6 @@ public class PagingData<T: Any> {
     internal let publisher: AnyPublisher<PageEvent<T>, Never>
 
     internal let receiver: UiReceiver
-    
 
     public static func empty() -> PagingData<T> {
         return PagingData<T>(CurrentValueSubject<PageEvent<T>, Never>(PageEvent<T>.StaticList(data: [])).eraseToAnyPublisher(), NoopReceiver())

@@ -36,12 +36,12 @@ private class MulticastedPagingData<T: Any> {
 
 extension Publisher where Failure == Never {
 
-    public func cachedIn<T: Any>() -> AnyPublisher<PagingData<T>, Never> {
+    public func cachedIn<T: Any>() -> AnyPublisher<PagingData<T>, Never> where Output == PagingData<T> {
         return cachedIn(tracker: nil)
     }
     
-    func cachedIn<T: Any>(tracker: ActivePublisherTracker?) -> AnyPublisher<PagingData<T>, Never> {
-        return self.map { MulticastedPagingData(parent: $0 as! PagingData<T>) }
+    func cachedIn<T: Any>(tracker: ActivePublisherTracker?) -> AnyPublisher<PagingData<T>, Never> where Output == PagingData<T> {
+        return self.map { MulticastedPagingData(parent: $0) }
             .runningReduce { (prev: MulticastedPagingData, next: MulticastedPagingData) in
                 prev.close()
                 return next

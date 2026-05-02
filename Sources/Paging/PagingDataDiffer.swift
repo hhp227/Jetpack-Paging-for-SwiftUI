@@ -29,7 +29,7 @@ class PagingDataDiffer<T: Any>: ProcessPageEventCallback {
     private var subscriptions = Set<AnyCancellable>()
     
     private func dispatchLoadStates(_ source: LoadStates, mediator: LoadStates?) {
-        if combinedLoadStatesCollection.source === source && combinedLoadStatesCollection.mediator === mediator {
+        if combinedLoadStatesCollection.source == source && combinedLoadStatesCollection.mediator == mediator {
             return
         }
         combinedLoadStatesCollection.set(source, mediator)

@@ -173,7 +173,11 @@ open class PageEvent<T: Any> {
                 pages: [TransformablePage<Any>.EMPTY_INITIAL_PAGE],
                 placeholdersBefore: 0,
                 placeholdersAfter: 0,
-                sourceLoadStates: LoadStates(.NotLoading(false), .NotLoading(true), .NotLoading(true))
+                sourceLoadStates: LoadStates(
+                    refresh: .NotLoading(false),
+                    prepend: .NotLoading(true),
+                    append: .NotLoading(true)
+                )
             )
         }
     }

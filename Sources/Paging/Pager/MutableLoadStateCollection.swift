@@ -10,7 +10,7 @@ internal class MutableLoadStateCollection {
     var prepend: LoadState = .NotLoading(false)
     var append: LoadState = .NotLoading(false)
     
-    func snapshot() -> LoadStates { LoadStates(refresh, prepend, append) }
+    func snapshot() -> LoadStates { LoadStates(refresh: refresh, prepend: prepend, append: append) }
     
     func get(_ loadType: LoadType) -> LoadState {
         switch loadType {

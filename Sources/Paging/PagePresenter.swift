@@ -254,12 +254,11 @@ internal class PagePresenter<T: Any>: NullPaddedList {
     }
     
     internal static func initial() -> PagePresenter<T> {
-        return PagePresenter<T>(PageEvent<T>.Insert<T>.Refresh(
+        return PagePresenter<T>(
             pages: [TransformablePage<T>.EMPTY_INITIAL_PAGE],
             placeholdersBefore: 0,
-            placeholdersAfter: 0,
-            sourceLoadStates: LoadStates(.NotLoading(false), .NotLoading(true), .NotLoading(true))
-        ))
+            placeholdersAfter: 0
+        )
     }
 }
 

@@ -165,7 +165,7 @@ internal class FlattenedPageEventStorage<T: Any> {
 
 extension Publisher {
     func withIndex() -> AnyPublisher<(index: Int, value: Output), Failure> {
-        self.scan((index: -1, value: nil as Output?)) { (accum, current) in
+        self.scan((index: 0, value: nil as Output?)) { (accum, current) in
             (index: accum.index + 1, value: current)
         }
         .compactMap { (index, value) in

@@ -9,9 +9,8 @@ import Foundation
 import Combine
 
 extension PagingData {
-
-    public func transform<R: Any>(_ transform: @escaping (PageEvent<T>) -> PageEvent<R>) -> PagingData<T> {
-        return PagingData(publisher.map { transform($0) }.upstream, receiver)
+    public func transform<R: Any>(_ transform: @escaping (PageEvent<T>) -> PageEvent<R>) -> PagingData<R> {
+        return PagingData<R>(publisher.map { transform($0) }.eraseToAnyPublisher(), receiver)
     }
     
     public func filter(_ predicate: @escaping (T) -> Bool) -> PagingData<T> {
