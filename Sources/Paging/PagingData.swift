@@ -17,7 +17,7 @@ public class PagingData<T: Any> {
     
     internal var cancellable: AnyCancellable? = nil
     
-    static func empty<T: Any>() -> PagingData<T> {
+    public static func empty<T: Any>() -> PagingData<T> {
         return PagingData<T>(CurrentValueSubject<PageEvent<T>, Never>(PageEvent<T>.StaticList(data: [])).eraseToAnyPublisher(), NoopReceiver(), NoopHintReceiver())
     }
     
