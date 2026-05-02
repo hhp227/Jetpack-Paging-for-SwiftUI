@@ -10,47 +10,101 @@ import Combine
 
 internal class CachedPageEventPublisher<T: Any> {
     private let pageController = FlattenedPageController<T>()
-    private let mutableSharedSrc = CurrentValueSubject<(index: Int, value: PageEvent<T>)?, Never>(nil)
+    private let mutableSharedSrc = PassthroughSubject<EnumeratedSequence<[PageEvent<T>]>.Element?, Never>()
     private var cancellables = Set<AnyCancellable>()
     private let upstream: AnyPublisher<PageEvent<T>, Never>
 
-    private lazy var sharedForDownstream: AnyPublisher<(index: Int, value: PageEvent<T>)?, Never> = {
-        mutableSharedSrc
-            .handleEvents(receiveSubscription: { _ in
-                let history = self.pageController.getStateAsEvents()
-                self.job.store(in: &self.cancellables)
-                history.forEach { self.mutableSharedSrc.send($0) }
-            })
-            .share()
-            .eraseToAnyPublisher()
-    }()
-
     private lazy var job: AnyCancellable = upstream
         .withIndex()
-        .sink(receiveCompletion: { _ in self.mutableSharedSrc.send(nil) }, receiveValue: { self.mutableSharedSrc.send($0) })
+        .sink(
+            receiveCompletion: { _ in self.mutableSharedSrc.send(nil) },
+            receiveValue: {
+                self.mutableSharedSrc.send($0)
+                self.pageController.record($0)
+            }
+        )
+    
+    private func getSharedForDownstream() -> AnyPublisher<EnumeratedSequence<[PageEvent<T>]>.Element?, Never> {
+        print("getSharedForDownstream")
+        let history = self.pageController.getStateAsEvents()
+        print("history: \(history)")
+        self.job.store(in: &self.cancellables)
+        
+        return history.publisher
+            .map { Optional($0) }
+            .append(mutableSharedSrc)
+            .eraseToAnyPublisher()
+    }
 
     func close() {
         job.cancel()
     }
-
-    lazy var downstreamPublisher = {
-        let downstreamSubject = PassthroughSubject<PageEvent<T>, Never>()
-        var maxEventIndex = Int.min
-
-        sharedForDownstream
-            .prefix(while: { $0 != nil })
-            .sink { indexedValue in
-                if indexedValue!.index > maxEventIndex {
-                    downstreamSubject.send(indexedValue!.value)
-                    maxEventIndex = indexedValue!.index
-                }
-            }
-            .store(in: &self.cancellables)
-        return downstreamSubject.eraseToAnyPublisher()
-    }()
+    
+    var downstreamPublisher: AnyPublisher<PageEvent<T>, Never> {
+        let callback1: (EnumeratedSequence<[PageEvent<T>]>.Element?, Int) -> Void = { print("test1 maxEventIndex=\($1) indexedValue: offset=\($0!.offset) value=\($0?.element) \(($0?.element as? PageEvent<T>.Insert<T>)?.loadType)") }
+        let callback2: (EnumeratedSequence<[PageEvent<T>]>.Element?, Int) -> Void = { print("test2 maxEventIndex=\($1) indexedValue: offset=\($0!.offset) value=\($0?.element) \(($0?.element as? PageEvent<T>.Insert<T>)?.loadType)") }
+        return DownstreamPublisher<T>(sharedForDownstream: getSharedForDownstream, callback1: callback1, callback2: callback2).eraseToAnyPublisher()
+    }
 
     init(src: AnyPublisher<PageEvent<T>, Never>) {
         self.upstream = src
+    }
+}
+
+struct DownstreamPublisher<T: Any>: Publisher {
+    typealias Output = PageEvent<T>
+    typealias Failure = Never
+    
+    var sharedForDownstream: () -> AnyPublisher<EnumeratedSequence<[PageEvent<T>]>.Element?, Never>
+
+    var callback1: (EnumeratedSequence<[PageEvent<T>]>.Element?, Int) -> Void
+    var callback2: (EnumeratedSequence<[PageEvent<T>]>.Element?, Int) -> Void
+
+    func receive<S>(subscriber: S) where S : Subscriber, Never == S.Failure, PageEvent<T> == S.Input {
+        let subscription = DownstreamSubscription(subscriber: subscriber, sharedForDownstream: sharedForDownstream, callback1: callback1, callback2: callback2)
+
+        subscriber.receive(subscription: subscription)
+    }
+
+    private class DownstreamSubscription<S: Subscriber>: Subscription where S.Input == PageEvent<T>, S.Failure == Never {
+        var subscriber: S?
+        var maxEventIndex = Int.min
+        var sharedForDownstream: () -> AnyPublisher<EnumeratedSequence<[PageEvent<T>]>.Element?, Never>
+        var callback1: (EnumeratedSequence<[PageEvent<T>]>.Element?, Int) -> Void
+        var callback2: (EnumeratedSequence<[PageEvent<T>]>.Element?, Int) -> Void
+        var cancellable: AnyCancellable? = nil
+
+        init(subscriber: S, sharedForDownstream: @escaping () ->  AnyPublisher<EnumeratedSequence<[PageEvent<T>]>.Element?, Never>, callback1: @escaping (EnumeratedSequence<[PageEvent<T>]>.Element?, Int) -> Void, callback2: @escaping (EnumeratedSequence<[PageEvent<T>]>.Element?, Int) -> Void) {
+            self.subscriber = subscriber
+            self.sharedForDownstream = sharedForDownstream
+            self.callback1 = callback1
+            self.callback2 = callback2
+        }
+
+        func request(_ demand: Subscribers.Demand) {
+            self.cancellable = self.sharedForDownstream()
+                .prefix(while: { $0 != nil })
+                .sink { indexedValue in
+                    self.callback1(indexedValue, self.maxEventIndex)
+                    if indexedValue!.offset > self.maxEventIndex {
+                        self.callback2(indexedValue, self.maxEventIndex)
+                        _ = self.subscriber?.receive(indexedValue!.element)
+                        self.maxEventIndex = indexedValue!.offset
+                    }
+                }
+            // better code
+            /*sharedForDownstream
+                .prefix(while: { $0 != nil })
+                .compactMap { $0 }
+                .filter { $0.offset > self.maxEventIndex }
+                .handleEvents(receiveOutput: { self.maxEventIndex = $0.offset })
+                .sink { _ = self.subscriber?.receive($0.element) }
+                .store(in: &cancellables)*/
+        }
+
+        func cancel() {
+            subscriber = nil
+        }
     }
 }
 
@@ -66,12 +120,12 @@ private class FlattenedPageController<T: Any> {
         }
     }
 
-    func getStateAsEvents() -> [(index: Int, value: PageEvent<T>)] {
+    func getStateAsEvents() -> [EnumeratedSequence<[PageEvent<T>]>.Element] {
         return lock.withLock {
             let catchupEvents = list.getAsEvents()
             let startEventIndex = maxEventIndex - catchupEvents.count + 1
             return catchupEvents.enumerated().map { (index, pageEvent) in
-                (index: startEventIndex + index, value: pageEvent)
+                (offset: startEventIndex + index, element: pageEvent)
             }
         }
     }
@@ -82,7 +136,7 @@ internal class FlattenedPageEventStorage<T: Any> {
     private var placeholdersAfter = 0
     private var pages = [TransformablePage<T>]()
     private var sourceStates = MutableLoadStateCollection()
-    private var mediatorStates: LoadStates?
+    private var mediatorStates: LoadStates? = nil
     private var receivedFirstEvent = false
 
     func append(_ event: PageEvent<T>) {
@@ -94,6 +148,8 @@ internal class FlattenedPageEventStorage<T: Any> {
             handlePageDrop(drop)
         case let loadStateUpdate as PageEvent<T>.LoadStateUpdate<T>:
             handleLoadStateUpdate(loadStateUpdate)
+        case let staticList as PageEvent<T>.StaticList<T>:
+            handleStaticList(staticList)
         default:
             break
         }
@@ -122,19 +178,34 @@ internal class FlattenedPageEventStorage<T: Any> {
             pages.removeAll()
             placeholdersAfter = event.placeholdersAfter
             placeholdersBefore = event.placeholdersBefore
-            pages.append(contentsOf: event.pages)
+            pages += event.pages
         case .prepend:
             placeholdersBefore = event.placeholdersBefore
             pages.insert(contentsOf: event.pages.reversed(), at: 0)
         case .append:
             placeholdersAfter = event.placeholdersAfter
-            pages.append(contentsOf: event.pages)
+            pages += event.pages
         }
     }
 
     private func handleLoadStateUpdate(_ event: PageEvent<T>.LoadStateUpdate<T>) {
         sourceStates.set(event.source)
         mediatorStates = event.mediator
+    }
+    
+    private func handleStaticList(_ event: PageEvent<T>.StaticList<T>) {
+        if event.sourceLoadStates != nil {
+            sourceStates.set(event.sourceLoadStates!)
+        }
+        
+        if event.mediatorLoadStates != nil {
+            mediatorStates = event.mediatorLoadStates
+        }
+        
+        pages.removeAll()
+        placeholdersAfter = 0
+        placeholdersBefore = 0
+        pages.append(TransformablePage(originalPageOffset: 0, data: event.data))
     }
 
     func getAsEvents() -> [PageEvent<T>] {
@@ -164,12 +235,12 @@ internal class FlattenedPageEventStorage<T: Any> {
 }
 
 extension Publisher {
-    func withIndex() -> AnyPublisher<(index: Int, value: Output), Failure> {
-        self.scan((index: 0, value: nil as Output?)) { (accum, current) in
-            (index: accum.index + 1, value: current)
+    func withIndex() -> AnyPublisher<EnumeratedSequence<[Output]>.Element, Failure> {
+        self.scan((offset: -1, element: nil as Output?)) { (acc, current) in
+            (offset: acc.offset + 1, element: current)
         }
         .compactMap { (index, value) in
-            value.map { (index: index, value: $0) }
+            value.map { (offset: index, element: $0) }
         }
         .eraseToAnyPublisher()
     }

@@ -19,8 +19,6 @@ internal class PageFetcherSnapshot<Key: Equatable, Value: Any> {
 
     private let retryPublisher: AnyPublisher<Void, Never>
 
-    private let triggerRemoteRefresh: Bool
-
     let remoteMediatorConnection: (any RemoteMediatorConnection)?
 
     private let previousPagingState: PagingState<Key, Value>?
@@ -29,12 +27,44 @@ internal class PageFetcherSnapshot<Key: Equatable, Value: Any> {
     
     private let hintHandler = HintHandler()
     
+    private var pageEventCollected = false
+    
     private var pageEvent = CurrentValueSubject<PageEvent<Value>, Never>(PageEvent<Value>.StaticList(data: []))
     
     private let stateHolder: PageFetcherSnapshotState<Key, Value>.Holder<Key, Value>
-    
-    let pageEventSubject: CurrentValueSubject<PageEvent<Value>, Never>
-    
+
+    var pageEventPublisher: AnyPublisher<PageEvent<Value>, Never> {
+        guard pageEventCollected.compareAndSet(false, true) else {
+            fatalError("Attempt to collect twice from pageEventPublisher, which is an illegal operation. Did you " + "forget to call cachedIn()?")
+        }
+        let subject = PassthroughSubject<PageEvent<Value>, Never>()
+
+        Task {
+            pageEvent.sink { event in
+                if !(event is PageEvent<Value>.StaticList<Value>) {
+                    subject.send(event)
+                }
+            }
+            .store(in: &subscriptions)
+
+            /*if let rmc = remoteMediatorConnection {
+                let pagingState = previousPagingState ?? stateHolder.withLock { state in
+                    state.currentPagingState(viewportHint: nil)
+                }
+                rmc.requestRefreshIfAllowed(pagingState)
+            }*/
+            await self.doInitialLoad()
+            if !(self.stateHolder.withLock(block: { state in state.sourceLoadStates.get(.refresh) }) is LoadState.Error) { // TODO 여기가 이상함
+                self.startConsumingHints()
+            }
+        }
+        return subject
+            .handleEvents(receiveSubscription: { _ in
+                subject.send(PageEvent<Value>.LoadStateUpdate(source: self.stateHolder.withLock { $0.sourceLoadStates.snapshot() }))
+            })
+            .eraseToAnyPublisher()
+    }
+
     var subscriptions = Set<AnyCancellable>()
     
     func accessHint(_ viewportHint: ViewportHint) {
@@ -42,7 +72,8 @@ internal class PageFetcherSnapshot<Key: Equatable, Value: Any> {
     }
     
     func close() {
-        // TODO
+        subscriptions.forEach { $0.cancel() }
+        subscriptions.removeAll()
     }
     
     func currentPagingState() -> PagingState<Key, Value> {
@@ -53,20 +84,21 @@ internal class PageFetcherSnapshot<Key: Equatable, Value: Any> {
     
     private func startConsumingHints() {
         if config.jumpThreshold != Int.min {
-            [.append, .prepend]
+            [LoadType.append, LoadType.prepend]
                 .forEach { loadType in
                     self.hintHandler.hintFor(loadType)
                         .filter { hint in
                             hint.presentedItemsBefore * -1 > self.config.jumpThreshold || hint.presentedItemsAfter * -1 > self.config.jumpThreshold
-                        }.sink { _ in
-                            self.invalidate()
-                        }.store(in: &self.subscriptions)
+                        }
+                        .sink { _ in self.invalidate() }
+                        .store(in: &self.subscriptions)
                 }
         }
         self.collectAsGenerationalViewportHints(
             self.stateHolder.withLock { state in state.consumePrependGenerationIdAsPublisher() },
             .prepend
         )
+        
         self.collectAsGenerationalViewportHints(
             self.stateHolder.withLock { state in state.consumeAppendGenerationIdAsPublisher() },
             .append
@@ -80,6 +112,7 @@ internal class PageFetcherSnapshot<Key: Equatable, Value: Any> {
                 if state.sourceLoadStates.get(loadType) === LoadState.NotLoading(true) {
                     
                 } else if !(state.sourceLoadStates.get(loadType) is LoadState.Error) {
+                    //print("TEST!!!!!!!!!!")
                     state.sourceLoadStates.set(loadType, LoadState.NotLoading(false))
                 }
             }
@@ -87,14 +120,17 @@ internal class PageFetcherSnapshot<Key: Equatable, Value: Any> {
                 .dropFirst(generstionId == 0 ? 0 : 1)
                 .map { hint in GenerationalViewportHint(generationId: generstionId, hint: hint) }
                 .eraseToAnyPublisher()
-        }.runningReduce { previous, next in
+        }
+        .runningReduce { previous, next in
             next.shouldPrioritizeOver(previous, loadType) ? next : previous
-        }.sink { generationalHint in
-            // TODO collectLatest로 변경하고 Task 어떻게 할건지
+        }
+        .buffer(size: 1, prefetch: .keepFull, whenFull: .dropOldest)
+        .sink { generationalHint in
             Task {
                 await self.doLoad(loadType, generationalHint)
             }
-        }.store(in: &subscriptions)
+        }
+        .store(in: &subscriptions)
     }
     
     private func loadParams(_ loadType: LoadType, _ key: Key?) -> PagingSource<Key, Value>.LoadParams<Key> {
@@ -129,6 +165,21 @@ internal class PageFetcherSnapshot<Key: Equatable, Value: Any> {
                     pageEvent.value = state.toPageEvent(.refresh, result)
                 }
             }
+            // 추가
+            /*if remoteMediatorConnection != nil {
+                if result.prevKey == nil || result.nextKey == nil {
+                    let pagingState = stateHolder.withLock { state in
+                        state.currentPagingState(viewportHint: hintHandler.lastAccessHint)
+                    }
+
+                    if result.prevKey == nil {
+                        remoteMediatorConnection!.requestLoad(.PREPEND, pagingState)
+                    }
+                    if result.nextKey == nil {
+                        remoteMediatorConnection!.requestLoad(.APPEND, pagingState)
+                    }
+                }
+            }*/
         case let result as PagingSource<Key, Value>.LoadResult<Key, Value>.Error<Key, Value>:
             stateHolder.withLock { state in
                 let loadState = LoadState.Error(result.error)
@@ -248,7 +299,12 @@ internal class PageFetcherSnapshot<Key: Equatable, Value: Any> {
                 default:
                     fatalError()
                 }
+                let dropType: LoadType = loadType == .prepend ? .append : .prepend
                 stateHolder.withLock { state in
+                    if let event = state.dropEventOrNil(dropType, generationalHint.hint) {
+                        state.drop(event)
+                        pageEvent.send(event)
+                    }
                     loadKey = state.nextLoadKeyOrNil(
                         loadType,
                         generationalHint.generationId,
@@ -258,17 +314,30 @@ internal class PageFetcherSnapshot<Key: Equatable, Value: Any> {
                     if loadKey == nil && !(state.sourceLoadStates.get(loadType) is LoadState.Error) {
                         state.sourceLoadStates.set(
                             loadType,
-                            endOfPaginationReached ? .NotLoading(true) : .NotLoading(false)
+                            endOfPaginationReached ? LoadState.NotLoading(true) : LoadState.NotLoading(false)
                         )
                     }
                     let pageEvent = state.toPageEvent(loadType, result as! PagingSource<Key, Value>.LoadResult<Key, Value>.Page<Key, Value>)
-                    
+
                     self.pageEvent.value = pageEvent
                 }
+                /*let endsPrepend = params is PagingSource.LoadParams<Key>.Prepend && (result as? PagingSource.LoadResult<Key, Value>.Page)?.prevKey == nil
+                let endsAppend = params is PagingSource.LoadParams<Key>.Append && (result as? PagingSource.LoadResult<Key, Value>.Page)?.nextKey == nil
+                if remoteMediatorConnection != nil && (endsPrepend || endsAppend) {
+                    let pagingState = stateHolder.withLock { state in
+                        state.currentPagingState(viewportHint: hintHandler.lastAccessHint)
+                    }
+                    
+                    if endsPrepend {
+                        remoteMediatorConnection!.requestLoad(.PREPEND, pagingState)
+                    }
+                    if endsAppend {
+                        remoteMediatorConnection!.requestLoad(.APPEND, pagingState)
+                    }
+                }*/
             }
         }
         
-        //print("doLoad, loadKey: \(loadKey), \(currentPagingState().pages.endIndex - 1)")
         await loop()
     }
     
@@ -282,8 +351,7 @@ internal class PageFetcherSnapshot<Key: Equatable, Value: Any> {
         pagingSource: PagingSource<Key, Value>,
         config: PagingConfig,
         retryPublisher: AnyPublisher<Void, Never>,
-        triggerRemoteRefresh: Bool = false,
-        remoteMediatorConnection: (some RemoteMediatorConnection)? = nil,
+        remoteMediatorConnection: (any RemoteMediatorConnection)? = nil,
         previousPagingState: PagingState<Key, Value>? = nil,
         invalidate: @escaping () -> Void = {}
     ) {
@@ -291,29 +359,14 @@ internal class PageFetcherSnapshot<Key: Equatable, Value: Any> {
         self.pagingSource = pagingSource
         self.config = config
         self.retryPublisher = retryPublisher
-        self.triggerRemoteRefresh = triggerRemoteRefresh
         self.remoteMediatorConnection = remoteMediatorConnection
         self.previousPagingState = previousPagingState
         self.invalidate = invalidate
         self.stateHolder = PageFetcherSnapshotState<Key, Value>.Holder<Key, Value>(config: self.config)
-        self.pageEventSubject = CurrentValueSubject<PageEvent<Value>, Never>(pageEvent.value)
-        
-        self.pageEventSubject.send(PageEvent<Value>.LoadStateUpdate(source: self.stateHolder.withLock { $0.sourceLoadStates.snapshot() }))
-        self.pageEvent.sink {
-            if !($0 is PageEvent<Value>.StaticList<Value>) {
-                self.pageEventSubject.send($0)
-            }
-        }.store(in: &self.subscriptions)
-        Task {
-            await self.doInitialLoad()
-            if !(self.stateHolder.withLock(block: { state in state.sourceLoadStates.get(.refresh) }) is LoadState.Error) { // TODO 여기가 이상함
-                self.startConsumingHints()
-            }
-        }
     }
 }
 
-private extension PageFetcherSnapshotState {
+private extension PageFetcherSnapshotState { // TODO 여기서 동작이 다르게 나옴... 에러가 의심됨
     func setLoading(_ loadType: LoadType, _ pageEvent: CurrentValueSubject<PageEvent<Value>, Never>) {
         if sourceLoadStates.get(loadType) !== LoadState.Loading.instance {
             sourceLoadStates.set(loadType, LoadState.Loading.instance)
@@ -379,6 +432,17 @@ extension Publisher {
         return map { value -> T in
             acc = acc == nil ? value : operation(acc as! T, value)
             return acc as! T
+        }
+    }
+}
+
+extension Bool {
+    mutating func compareAndSet(_ expect: Bool, _ update: Bool) -> Bool {
+        if self == expect {
+            self = update
+            return true
+        } else {
+            return false
         }
     }
 }

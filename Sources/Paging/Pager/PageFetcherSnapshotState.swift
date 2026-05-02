@@ -66,7 +66,7 @@ internal class PageFetcherSnapshotState<Key: Any, Value: Any> {
     internal func generationId(_ loadType: LoadType) -> Int {
         switch loadType {
         case .refresh:
-            fatalError("Cannot get loadId for loadType: refresh")
+            fatalError("Cannot get loadId for loadType: REFRESH")
         case .prepend:
             return prependGenerationId
         case .append:
@@ -79,7 +79,7 @@ internal class PageFetcherSnapshotState<Key: Any, Value: Any> {
     private(set) internal var sourceLoadStates: MutableLoadStateCollection = {
         var sourceLoadStates = MutableLoadStateCollection()
         
-        sourceLoadStates.set(.refresh, LoadState.Loading.instance)
+        sourceLoadStates.set(LoadType.refresh, LoadState.Loading.instance)
         return sourceLoadStates
     }()
     
@@ -94,7 +94,7 @@ internal class PageFetcherSnapshotState<Key: Any, Value: Any> {
             .handleEvents(receiveSubscription: { _ in self.appendGenerationIdCurrentValueSubject.send(self.appendGenerationId) })
             .eraseToAnyPublisher()
     }
-    
+
     internal func toPageEvent(_ loadType: LoadType, _ page: PagingSource<Key, Value>.LoadResult<Key, Value>.Page<Key, Value>) -> PageEvent<Value> {
         let sourcePageIndex: Int
         switch loadType {
@@ -106,7 +106,7 @@ internal class PageFetcherSnapshotState<Key: Any, Value: Any> {
             sourcePageIndex = pages.count - initialPageIndex - 1
         }
         let pages = [TransformablePage(originalPageOffset: sourcePageIndex, data: page.data)]
-        
+
         switch loadType {
         case .refresh:
             return PageEvent<Value>.Insert.Refresh(
@@ -132,7 +132,7 @@ internal class PageFetcherSnapshotState<Key: Any, Value: Any> {
             )
         }
     }
-    
+
     func insert(_ loadId: Int, _ loadType: LoadType, page: PagingSource<Key, Value>.LoadResult<Key, Value>.Page<Key, Value>) -> Bool {
         switch loadType {
         case .refresh:
@@ -173,29 +173,38 @@ internal class PageFetcherSnapshotState<Key: Any, Value: Any> {
         }
         return true
     }
-    
+
     func drop(_ event: PageEvent<Value>.Drop<Value>) {
-        assert(event.pageCount <= pages.count, "invalid drop count. have \(pages.count) but wanted to drop \(event.pageCount)")
+        guard event.pageCount <= pages.count else {
+            fatalError()
+        }
+        
         failedHintsByLoadType.removeValue(forKey: event.loadType)
         sourceLoadStates.set(event.loadType, .NotLoading(false))
         
         switch event.loadType {
         case .prepend:
-            _pages.removeFirst(event.pageCount)
+            for _ in 0..<event.pageCount {
+                _pages.remove(at: 0)
+            }
             initialPageIndex -= event.pageCount
             placeholdersBefore = event.placeholdersRemaining
+            
             prependGenerationId += 1
             prependGenerationIdCurrentValueSubject.send(prependGenerationId)
         case .append:
-            _pages.removeLast(event.pageCount)
+            for _ in 0..<event.pageCount {
+                _pages.remove(at: pages.count - 1)
+            }
             placeholdersAfter = event.placeholdersRemaining
+            
             appendGenerationId += 1
             appendGenerationIdCurrentValueSubject.send(appendGenerationId)
-        case .refresh:
-            fatalError("cannot drop \(event.loadType)")
+        default:
+            fatalError()
         }
     }
-    
+
     func dropEventOrNil(_ loadType: LoadType, _ hint: ViewportHint) -> PageEvent<Value>.Drop<Value>? {
         if config.maxSize == Int.max {
             return nil
@@ -206,45 +215,43 @@ internal class PageFetcherSnapshotState<Key: Any, Value: Any> {
         if storageCount <= config.maxSize {
             return nil
         }
-        assert(loadType != .refresh, "Drop LoadType must be prepend or append, but got \(loadType)")
+        guard loadType != .refresh else {
+            fatalError("Drop LoadType must be PREPEND or APPEND, but got \(loadType)")
+        }
+
         var pagesToDrop = 0
         var itemsToDrop = 0
-        
         while pagesToDrop < pages.count && storageCount - itemsToDrop > config.maxSize {
-            let pageCount: Int
-            
-            switch loadType {
-            case .prepend:
-                pageCount = pages[pagesToDrop].data.count
-            default:
-                pageCount = pages[pages.count - 1 - pagesToDrop].data.count
+            let pageSize: Int
+            if loadType == .prepend {
+                pageSize = pages[pagesToDrop].data.count
+            } else {
+                pageSize = pages[pages.endIndex - 1 - pagesToDrop].data.count
             }
-            let itemAfterDrop: Int
-            switch loadType {
-            case .prepend:
-                itemAfterDrop = hint.presentedItemsBefore - itemsToDrop - pageCount
-            default:
-                itemAfterDrop = hint.presentedItemsAfter - itemsToDrop - pageCount
+            let itemsAfterDrop: Int
+            if loadType == .prepend {
+                itemsAfterDrop = hint.presentedItemsBefore - itemsToDrop - pageSize
+            } else {
+                itemsAfterDrop = hint.presentedItemsAfter - itemsToDrop - pageSize
             }
-            if itemAfterDrop < config.prefetchDistance {
+            if itemsAfterDrop < config.prefetchDistance {
                 break
             }
-            itemsToDrop += pageCount
+            itemsToDrop += pageSize
             pagesToDrop += 1
         }
-        switch pagesToDrop {
-        case 0:
+        if pagesToDrop == 0 {
             return nil
-        default:
-            return PageEvent<Value>.Drop<Value>(
+        } else {
+            return PageEvent.Drop(
                 loadType: loadType,
-                minPageOffset: loadType == .prepend ? -initialPageIndex : (pages.endIndex - 1) - initialPageIndex - (pagesToDrop - 1),
-                maxPageOffset: loadType == .prepend ? (pagesToDrop - 1) - initialPageIndex : (pages.endIndex - 1) - initialPageIndex,
+                minPageOffset: loadType == .prepend ? -initialPageIndex : pages.endIndex - 1 - initialPageIndex - (pagesToDrop - 1),
+                maxPageOffset: loadType == .prepend ? (pagesToDrop - 1) - initialPageIndex : pages.endIndex - 1 - initialPageIndex,
                 placeholdersRemaining: !config.enablePlaceholders ? 0 : loadType == .prepend ? placeholdersBefore + itemsToDrop : placeholdersAfter + itemsToDrop
             )
         }
     }
-    
+
     internal func currentPagingState(viewportHint: ViewportHint.Access?) -> PagingState<Key, Value> {
         return PagingState(
             pages: pages,

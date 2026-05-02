@@ -18,27 +18,52 @@ open class PageEvent<T: Any> {
             self.sourceLoadStates = sourceLoadStates
             self.mediatorLoadStates = mediatorLoadStates
         }
+
+        // MODIFIED
+        override func map<R>(_ transform: @escaping (T) -> R) -> PageEvent<R> {
+            return StaticList<R>(
+                data: data.map { transform($0) },
+                sourceLoadStates: sourceLoadStates,
+                mediatorLoadStates: mediatorLoadStates
+            )
+        }
+
+        override func flatMap<R>(_ transform: @escaping (T) -> [R]) -> PageEvent<R> {
+            return StaticList<R>(
+                data: data.flatMap { transform($0) },
+                sourceLoadStates: sourceLoadStates,
+                mediatorLoadStates: mediatorLoadStates
+            )
+        }
+
+        override func filter(_ predicate: @escaping (T) -> Bool) -> PageEvent<T> {
+            return StaticList(
+                data: data.filter { predicate($0) },
+                sourceLoadStates: sourceLoadStates,
+                mediatorLoadStates: mediatorLoadStates
+            )
+        }
     }
 
     class Insert<T: Any>: PageEvent<T> {
         let loadType: LoadType
-        
+
         let pages: [TransformablePage<T>]
-        
+
         let placeholdersBefore: Int
-        
+
         let placeholdersAfter: Int
-        
+
         let sourceLoadStates: LoadStates
-        
+
         var mediatorLoadStates: LoadStates? = nil
-        
+
         private func mapPages<R: Any>(_ transform: @escaping (TransformablePage<T>) -> TransformablePage<R>) -> Insert<R> {
             return transformPages { pages in
                 pages.map(transform)
             }
         }
-        
+
         internal func transformPages<R: Any>(_ transform: @escaping ([TransformablePage<T>]) -> [TransformablePage<R>]) -> Insert<R> {
             return Insert<R>(
                 loadType: loadType,
@@ -49,7 +74,7 @@ open class PageEvent<T: Any> {
                 mediatorLoadStates: mediatorLoadStates
             )
         }
-        
+
         override func map<R>(_ transform: @escaping (T) -> R) -> PageEvent<R> {
             return mapPages {
                 TransformablePage(
@@ -60,7 +85,7 @@ open class PageEvent<T: Any> {
                 )
             }
         }
-        
+
         override func flatMap<R>(_ transform: @escaping (T) -> [R]) -> PageEvent<R> {
             return mapPages { transformPage in
                 var data = [R]()
@@ -80,7 +105,7 @@ open class PageEvent<T: Any> {
                 )
             }
         }
-        
+
         override func filter(_ predicate: @escaping (T) -> Bool) -> PageEvent<T> {
             return mapPages { transformPage in
                 var data = [T]()
@@ -99,7 +124,7 @@ open class PageEvent<T: Any> {
                 )
             }
         }
-        
+
         static func Refresh(
             pages: [TransformablePage<T>],
             placeholdersBefore: Int,
@@ -116,7 +141,7 @@ open class PageEvent<T: Any> {
                 mediatorLoadStates: mediatorLoadStates
             )
         }
-        
+
         static func Prepend(
             pages: [TransformablePage<T>],
             placeholdersBefore: Int,
@@ -132,7 +157,7 @@ open class PageEvent<T: Any> {
                 mediatorLoadStates: mediatorLoadStates
             )
         }
-        
+
         static func Append(
             pages: [TransformablePage<T>],
             placeholdersAfter: Int,
@@ -148,7 +173,7 @@ open class PageEvent<T: Any> {
                 mediatorLoadStates: mediatorLoadStates
             )
         }
-        
+
         private init(loadType: LoadType, pages: [TransformablePage<T>], placeholdersBefore: Int, placeholdersAfter: Int, sourceLoadStates: LoadStates, mediatorLoadStates: LoadStates? = nil) {
             self.loadType = loadType
             self.pages = pages
@@ -156,7 +181,7 @@ open class PageEvent<T: Any> {
             self.placeholdersAfter = placeholdersAfter
             self.sourceLoadStates = sourceLoadStates
             self.mediatorLoadStates = mediatorLoadStates
-            
+
             guard loadType == .append || placeholdersBefore >= 0 else {
                 fatalError("Prepend insert defining placeholdersBefore must be > 0, but was \(placeholdersBefore)")
             }
@@ -167,7 +192,7 @@ open class PageEvent<T: Any> {
                 fatalError("Cannot create a REFRESH Insert event with no TransformablePages as this could permanently stall pagination. Note that this check does not prevent empty LoadResults and is instead usually an indication of an internal error in Paging itself.")
             }
         }
-        
+
         static var EMPTY_REFRESH_LOCAL: Insert<Any> {
             Insert<Any>.Refresh(
                 pages: [TransformablePage<Any>.EMPTY_INITIAL_PAGE],
@@ -181,35 +206,36 @@ open class PageEvent<T: Any> {
             )
         }
     }
-    
+
     class Drop<T: Any>: PageEvent<T> {
         let loadType: LoadType
-        
+
         let minPageOffset: Int
-        
+
         let maxPageOffset: Int
-        
+
         let placeholdersRemaining: Int
-        
+
         init(loadType: LoadType, minPageOffset: Int, maxPageOffset: Int, placeholdersRemaining: Int) {
             self.loadType = loadType
             self.minPageOffset = minPageOffset
             self.maxPageOffset = maxPageOffset
             self.placeholdersRemaining = placeholdersRemaining
-            
+
             guard loadType != .refresh else {
                 fatalError("Drop load type must be PREPEND or APPEND")
             }
-            
+
             guard placeholdersRemaining >= 0 else {
                 fatalError("Invalid placeholdersRemaining \(placeholdersRemaining)")
             }
         }
-        
+
         var pageCount: Int {
             return maxPageOffset - minPageOffset + 1
         }
     }
+
 
     class LoadStateUpdate<T: Any>: PageEvent<T> {
         let source: LoadStates
@@ -221,15 +247,15 @@ open class PageEvent<T: Any> {
             self.mediator = mediator
         }
     }
-    
+
     open func map<R: Any>(_ transform: @escaping (T) -> R) -> PageEvent<R> {
         return self as! PageEvent<R>
     }
-    
+
     open func flatMap<R: Any>(_ transform: @escaping (T) -> [R]) -> PageEvent<R> {
         return self as! PageEvent<R>
     }
-    
+
     open func filter(_ predicate: @escaping (T) -> Bool) -> PageEvent<T> {
         return self
     }

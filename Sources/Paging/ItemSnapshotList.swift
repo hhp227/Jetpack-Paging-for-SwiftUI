@@ -11,9 +11,9 @@ struct ItemSnapshotList<T>: RangeReplaceableCollection {
     typealias SubSequence = ItemSnapshotList<T>
     typealias Indices = Range<Int>
     fileprivate var array: Array<T>
-    
+
     let placeholdersBefore: Int
-    
+
     let placeholdersAfter: Int
 
     var startIndex: Int { return array.startIndex }
@@ -24,7 +24,7 @@ struct ItemSnapshotList<T>: RangeReplaceableCollection {
     func index(after i: Int) -> Int {
         return array.index(after: i)
     }
-    
+
     var count: Int {
         return placeholdersBefore + array.count + placeholdersAfter
     }
