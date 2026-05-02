@@ -42,8 +42,7 @@ class MulticastedPagingData<T: Any> {
 }
 
 extension Publisher where Failure == Never {
-
-    func cachedIn<T: Any>() -> AnyPublisher<PagingData<T>, Never> where Output == PagingData<T> {
+    public func cachedIn<T: Any>() -> AnyPublisher<PagingData<T>, Never> where Output == PagingData<T> {
         return cachedIn(tracker: nil)
     }
     
