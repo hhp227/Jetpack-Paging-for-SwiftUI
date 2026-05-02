@@ -56,7 +56,7 @@ public class LazyPagingItems<T : Any>: ObservableObject, DifferCallback {
         pagingDataDiffer.refresh()
     }
 
-    @Published private(set) var loadState: CombinedLoadStates = CombinedLoadStates(
+    @Published public private(set) var loadState: CombinedLoadStates = CombinedLoadStates(
         refresh: InitialLoadStates.refresh,
         prepend: InitialLoadStates.prepend,
         append: InitialLoadStates.append,
@@ -115,7 +115,7 @@ private let InitialLoadStates = LoadStates(
 )
 
 extension Publisher where Failure == Never {
-    func collectAsLazyPagingItems<T>() -> LazyPagingItems<T> where Output == PagingData<T> {
+    public func collectAsLazyPagingItems<T>() -> LazyPagingItems<T> where Output == PagingData<T> {
         let lazyPagingItems = LazyPagingItems(self)
         lazyPagingItems.startCollecting()
         return lazyPagingItems
