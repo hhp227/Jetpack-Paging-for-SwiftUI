@@ -77,9 +77,9 @@ private class AccessorState<Key, Value> {
 
     func computeLoadStates() -> LoadStates {
         return LoadStates(
-            computeLoadTypeState(loadType: .refresh),
-            computeLoadTypeState(loadType: .append),
-            computeLoadTypeState(loadType: .prepend)
+            refresh: computeLoadTypeState(loadType: .refresh),
+            prepend: computeLoadTypeState(loadType: .prepend),
+            append: computeLoadTypeState(loadType: .append)
         )
     }
 
@@ -207,10 +207,8 @@ private class RemoteMediatorAccessImpl<Key: Any, Value: Any>: RemoteMediatorAcce
             let loadResult = remoteMediator.load(loadType: .refresh, state: pendingPagingState)
 
             switch (loadResult) {
-
             case .success(let endOfPaginationReached):
-
-                accessorState.use {
+                launchAppendPrepend = accessorState.use {
                     $0.clearPendingRequest(loadType: .refresh)
                     if endOfPaginationReached {
                         $0.setBlockState(loadType: .refresh, state: .completed)
@@ -226,10 +224,8 @@ private class RemoteMediatorAccessImpl<Key: Any, Value: Any>: RemoteMediatorAcce
                     return $0.getPendingBoundary() != nil
                 }
                 break
-
             case .error(let e):
-
-                accessorState.use {
+                launchAppendPrepend = accessorState.use {
                     $0.clearPendingRequest(loadType: .refresh)
                     $0.setError(loadType: .refresh, errorState: LoadState.Error(e))
                     return $0.getPendingBoundary() != nil
@@ -305,9 +301,7 @@ private class RemoteMediatorAccessImpl<Key: Any, Value: Any>: RemoteMediatorAcce
     func initialize() -> RemoteMediator<Key, Value>.InitializeAction {
         let action = remoteMediator.initialize()
 
-
         if action == RemoteMediator.InitializeAction.launchInitialRefresh {
-
             accessorState.use {
                 $0.setBlockState(loadType: .append, state: .requiresRefresh)
                 $0.setBlockState(loadType: .prepend, state: .requiresRefresh)

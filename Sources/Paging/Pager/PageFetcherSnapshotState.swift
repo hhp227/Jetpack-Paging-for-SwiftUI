@@ -84,11 +84,15 @@ internal class PageFetcherSnapshotState<Key: Any, Value: Any> {
     }()
     
     func consumePrependGenerationIdAsPublisher() -> AnyPublisher<Int, Never> {
-        return prependGenerationIdCurrentValueSubject.prepend(prependGenerationId).eraseToAnyPublisher()
+        return prependGenerationIdCurrentValueSubject
+            .handleEvents(receiveSubscription: { _ in self.prependGenerationIdCurrentValueSubject.send(self.prependGenerationId) })
+            .eraseToAnyPublisher()
     }
     
     func consumeAppendGenerationIdAsPublisher() -> AnyPublisher<Int, Never> {
-        return appendGenerationIdCurrentValueSubject.prepend(appendGenerationId).eraseToAnyPublisher()
+        return appendGenerationIdCurrentValueSubject
+            .handleEvents(receiveSubscription: { _ in self.appendGenerationIdCurrentValueSubject.send(self.appendGenerationId) })
+            .eraseToAnyPublisher()
     }
     
     internal func toPageEvent(_ loadType: LoadType, _ page: PagingSource<Key, Value>.LoadResult<Key, Value>.Page<Key, Value>) -> PageEvent<Value> {
@@ -270,8 +274,8 @@ internal class PageFetcherSnapshotState<Key: Any, Value: Any> {
     
     private init(_ config: PagingConfig) {
         self.config = config
-        self.prependGenerationIdCurrentValueSubject = CurrentValueSubject<Int, Never>(prependGenerationId)
-        self.appendGenerationIdCurrentValueSubject = CurrentValueSubject<Int, Never>(appendGenerationId)
+        self.prependGenerationIdCurrentValueSubject = CurrentValueSubject<Int, Never>(-1)
+        self.appendGenerationIdCurrentValueSubject = CurrentValueSubject<Int, Never>(-1)
     }
     
     class Holder<Key: Any, Value: Any> {

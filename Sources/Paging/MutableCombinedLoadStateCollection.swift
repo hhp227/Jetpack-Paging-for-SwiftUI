@@ -44,11 +44,11 @@ class MutableCombinedLoadStateCollection {
         let didChange = remote ? { () -> Bool in
             let lastMediator = mediator
             mediator = (mediator ?? LoadStates.IDLE).modifyState(type, state)
-            return mediator !== lastMediator
+            return mediator != lastMediator
         }() : {
             let lastSource = source
             source = source.modifyState(type, state)
-            return source !== lastSource
+            return source != lastSource
         }()
         
         updateHelperStatesAndDispatch()

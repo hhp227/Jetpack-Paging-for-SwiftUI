@@ -85,7 +85,11 @@ public class LazyPagingItems<T : Any>: ObservableObject, DifferCallback {
     }
 }
 
-private let InitialLoadStates = LoadStates(.Loading.instance, .NotLoading(false), .NotLoading(false))
+private let InitialLoadStates = LoadStates(
+    refresh: .Loading.instance,
+    prepend: .NotLoading(false),
+    append: .NotLoading(false)
+)
 
 extension Publisher where Failure == Never {
     public 
