@@ -9,7 +9,7 @@ import Foundation
 import Combine
 
 extension PagingData where T: Equatable {
-    internal func transform<R: Any>(_ transform: @escaping (PageEvent<T>) -> PageEvent<R>) -> PagingData<R> {
+    public func transform<R: Any>(_ transform: @escaping (PageEvent<T>) -> PageEvent<R>) -> PagingData<R> {
         return PagingData<R>(
             publisher
                 .map { transform($0) }
@@ -20,7 +20,7 @@ extension PagingData where T: Equatable {
         )
     }
     
-    internal func filter(_ predicate: @escaping (T) -> Bool) -> PagingData<T> {
+    public func filter(_ predicate: @escaping (T) -> Bool) -> PagingData<T> {
         return transform { $0.filter(predicate) }
     }
 }
