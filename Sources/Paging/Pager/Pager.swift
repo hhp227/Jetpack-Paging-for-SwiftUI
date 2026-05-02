@@ -8,7 +8,7 @@
 import Combine
 
 public class Pager<Key: Equatable, Value: Any> {
-    let publisher: AnyPublisher<PagingData<Value>, Never>
+    public let publisher: AnyPublisher<PagingData<Value>, Never>
     
     init(
         _ config: PagingConfig,
@@ -24,7 +24,7 @@ public class Pager<Key: Equatable, Value: Any> {
         ).publisher
     }
 
-    convenience init(
+    public convenience init(
         _ config: PagingConfig,
         _ initialKey: Key? = nil,
         _ pagingSourceFactory: @escaping () -> PagingSource<Key, Value>
