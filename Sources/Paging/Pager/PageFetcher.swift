@@ -69,6 +69,7 @@ internal class PageFetcher<Key: Equatable, Value: Any> {
     }
     
     func refresh() {
+        print("refresh")
         refreshEvents.send(data: true)
     }
     
