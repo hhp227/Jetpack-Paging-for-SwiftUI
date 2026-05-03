@@ -39,20 +39,20 @@ public class LazyPagingItems<T : Any>: ObservableObject, DifferCallback {
         }
     }
 
-    func get(_ index: Int) -> T? {
+    public func get(_ index: Int) -> T? {
         let _ = pagingDataDiffer.get(index: index)
         return itemSnapshotList[index]
     }
 
-    func peek(_ index: Int) -> T? {
+    public func peek(_ index: Int) -> T? {
         return itemSnapshotList[index]
     }
 
-    func retry() {
+    public func retry() {
         pagingDataDiffer.retry()
     }
 
-    func refresh() {
+    public func refresh() {
         pagingDataDiffer.refresh()
     }
 
