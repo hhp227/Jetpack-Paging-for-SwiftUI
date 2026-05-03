@@ -135,8 +135,7 @@ class PagingDataDiffer<T: Any>: ProcessPageEventCallback {
     }
 
     func refresh() {
-        print("refresh")
-        //receiver?.refresh()
+        receiver?.refresh()
     }
     
     var size: Int {
