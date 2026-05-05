@@ -29,6 +29,8 @@ internal class PageFetcherSnapshot<Key: Equatable, Value: Any> {
     
     private var pageEventCollected = false
     
+    private var hasStartedComsumingHints = false
+    
     private var pageEvent = CurrentValueSubject<PageEvent<Value>, Never>(PageEvent<Value>.StaticList(data: []))
     
     private let stateHolder: PageFetcherSnapshotState<Key, Value>.Holder<Key, Value>
@@ -55,8 +57,15 @@ internal class PageFetcherSnapshot<Key: Equatable, Value: Any> {
             }*/
             await self.doInitialLoad()
             if !(self.stateHolder.withLock(block: { state in state.sourceLoadStates.get(.refresh) }) is LoadState.Error) { // TODO 여기가 이상함
-                self.startConsumingHints()
+                self.startConsumingHintsIfNeeded()
             }
+            self.retryPublisher
+                .sink { _ in
+                    Task {
+                        await self.retryFailed()
+                    }
+                }
+                .store(in: &subscriptions)
         }
         return subject
             .handleEvents(receiveSubscription: { _ in
@@ -103,6 +112,28 @@ internal class PageFetcherSnapshot<Key: Equatable, Value: Any> {
             self.stateHolder.withLock { state in state.consumeAppendGenerationIdAsPublisher() },
             .append
         )
+    }
+    
+    private func startConsumingHintsIfNeeded() {
+        guard !hasStartedComsumingHints else { return }
+        hasStartedComsumingHints = true
+        startConsumingHints()
+    }
+    
+    private func retryFailed() async {
+        if stateHolder.withLock(block: { state in state.sourceLoadStates.get(.refresh) }) is LoadState.Error {
+            await doInitialLoad()
+            if !(self.stateHolder.withLock(block: { state in state.sourceLoadStates.get(.refresh) }) is LoadState.Error) {
+                startConsumingHintsIfNeeded()
+            }
+            return
+        }
+        let failedHints = stateHolder.withLock(block: { state in state.failedHintsByLoadType })
+        
+        for (loadType, hint) in failedHints {
+            stateHolder.withLock(block: { state in state.sourceLoadStates.set(loadType, .NotLoading(false)) })
+            hintHandler.forceSetHint(loadType, hint)
+        }
     }
     
     private func collectAsGenerationalViewportHints(_ publisher: AnyPublisher<Int, Never>, _ loadType: LoadType) {
