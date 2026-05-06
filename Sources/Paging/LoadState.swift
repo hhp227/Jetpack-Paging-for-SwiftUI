@@ -25,19 +25,7 @@ open class LoadState: Equatable {
     let endOfPaginationReached: Bool
     
     public static func == (lhs: LoadState, rhs: LoadState) -> Bool {
-        //return lhs.endOfPaginationReached == rhs.endOfPaginationReached
-        switch (lhs, rhs) {
-        case let (l as NotLoading, r as NotLoading):
-            return l.endOfPaginationReached == r.endOfPaginationReached
-        case (_ as Loading, _ as Loading):
-            return true
-        case let (l as Error, r as Error):
-            let ln = l.error as NSError
-            let rn = r.error as NSError
-            return ln.domain == rn.domain && ln.code == rn.code && ln.localizedDescription == rn.localizedDescription
-        default:
-            return false
-        }
+        return lhs.endOfPaginationReached == rhs.endOfPaginationReached
     }
     
     public class NotLoading: LoadState {

@@ -104,6 +104,8 @@ struct DownstreamPublisher<T: Any>: Publisher {
 
         func cancel() {
             subscriber = nil
+            cancellable?.cancel()
+            cancellable = nil
         }
     }
 }
