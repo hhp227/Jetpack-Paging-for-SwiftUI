@@ -90,7 +90,9 @@ open class PagingSource<Key: Any, Value: Any> {
             }
         }
 
-        public class Invalid<Key: Any, Value: Any>: LoadResult<Key, Value> {}
+        public class Invalid<Key: Any, Value: Any>: LoadResult<Key, Value> {
+            public override init() {}
+        }
 
         public class Page<Key: Any, Value: Any>: LoadResult<Key, Value> {
             let data: [Value]
