@@ -79,7 +79,7 @@ internal class PageFetcherSnapshotState<Key: Any, Value: Any> {
     private(set) internal var sourceLoadStates: MutableLoadStateCollection = {
         var sourceLoadStates = MutableLoadStateCollection()
         
-        sourceLoadStates.set(LoadType.refresh, LoadState.Loading.instance)
+        sourceLoadStates.set(.refresh, LoadState.Loading.instance)
         return sourceLoadStates
     }()
     
