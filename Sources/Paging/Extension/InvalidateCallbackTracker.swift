@@ -7,9 +7,7 @@
 
 import Foundation
 
-typealias T = () -> Void
-
-class InvalidateCallbackTracker {
+internal class InvalidateCallbackTracker<T> {
     private let callbackInvoker: (T) -> Void
     
     private let invalidGetter: (() -> Bool)?
@@ -22,7 +20,7 @@ class InvalidateCallbackTracker {
     
     internal func callbackCount() -> Int { callbacks.count }
     
-    internal func registerInvalidatedCallback(callback: @escaping T) {
+    internal func registerInvalidatedCallback(callback: T) {
         if invalidGetter?() == true {
             invalidate()
         }
@@ -47,15 +45,15 @@ class InvalidateCallbackTracker {
     
     internal func unregisterInvalidatedCallback(callback: T) {
         lock.withLock {
-            if let index = callbacks.firstIndex(where: { $0() == callback() }) {
+            if let index = callbacks.firstIndex(where: { $0 as AnyObject === callback as AnyObject }) {
                 callbacks.remove(at: index)
             }
         }
     }
     
-    internal func invalidate() {
+    internal func invalidate() -> Bool {
         if invalid {
-            return
+            return false
         }
         
         var callbacksToInvoke: [T]?
@@ -70,6 +68,7 @@ class InvalidateCallbackTracker {
             callbacks.removeAll()
         }
         callbacksToInvoke?.forEach(callbackInvoker)
+        return true
     }
     
     init(callbackInvoker: @escaping (T) -> Void, _ invalidGetter: (() -> Bool)? = nil) {

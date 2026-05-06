@@ -8,7 +8,7 @@
 import Accessibility
 
 open class PagingSource<Key: Any, Value: Any> {
-    private let invalidateCallbackTracker = InvalidateCallbackTracker(
+    private let invalidateCallbackTracker = InvalidateCallbackTracker<() -> Void>(
         callbackInvoker: { $0() }
     )
 
@@ -91,7 +91,7 @@ open class PagingSource<Key: Any, Value: Any> {
         }
 
         public class Invalid<Key: Any, Value: Any>: LoadResult<Key, Value> {
-            public override init() {}
+            override init() {}
         }
 
         public class Page<Key: Any, Value: Any>: LoadResult<Key, Value> {

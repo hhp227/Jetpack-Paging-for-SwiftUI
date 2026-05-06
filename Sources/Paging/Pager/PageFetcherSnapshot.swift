@@ -90,7 +90,7 @@ internal class PageFetcherSnapshot<Key: Equatable, Value: Any> {
     
     private func startConsumingHints() {
         if config.jumpThreshold != Int.min {
-            [LoadType.append, LoadType.prepend]
+            [.append, .prepend]
                 .forEach { loadType in
                     self.hintHandler.hintFor(loadType)
                         .filter { hint in
