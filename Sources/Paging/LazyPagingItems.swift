@@ -122,11 +122,13 @@ extension Publisher where Failure == Never {
     }
 }
 
-extension ForEach where Data == Range<Int>, ID == Int, Content : View {
-    public init<T>(_ data: LazyPagingItems<T>, @ViewBuilder content: @escaping (T?) -> Content) {
+extension ForEach where Data == Range<Int>, ID == Int, Content == AnyView {
+    public init<T, ItemContent: View>(_ data: LazyPagingItems<T>, @ViewBuilder content: @escaping (T?) -> ItemContent) {
         print("???? \(data.itemCount)")
         self.init(0..<data.itemCount, id: \.self) { index in
-            content(data.get(index))
+            AnyView(content(data.peek(index)).onAppear {
+                let _ = data.get(index)
+            })
         }
     }
 }

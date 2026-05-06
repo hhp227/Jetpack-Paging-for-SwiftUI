@@ -29,11 +29,13 @@ internal class PageFetcherSnapshot<Key: Equatable, Value: Any> {
     
     private var pageEventCollected = false
     
-    private var hasStartedComsumingHints = false
-    
     private var pageEvent = CurrentValueSubject<PageEvent<Value>, Never>(PageEvent<Value>.StaticList(data: []))
     
     private let stateHolder: PageFetcherSnapshotState<Key, Value>.Holder<Key, Value>
+
+    private var prependLoadTask: Task<Void, Never>?
+
+    private var appendLoadTask: Task<Void, Never>?
 
     var pageEventPublisher: AnyPublisher<PageEvent<Value>, Never> {
         guard pageEventCollected.compareAndSet(false, true) else {
@@ -57,15 +59,8 @@ internal class PageFetcherSnapshot<Key: Equatable, Value: Any> {
             }*/
             await self.doInitialLoad()
             if !(self.stateHolder.withLock(block: { state in state.sourceLoadStates.get(.refresh) }) is LoadState.Error) { // TODO 여기가 이상함
-                self.startConsumingHintsIfNeeded()
+                self.startConsumingHints()
             }
-            self.retryPublisher
-                .sink { _ in
-                    Task {
-                        await self.retryFailed()
-                    }
-                }
-                .store(in: &subscriptions)
         }
         return subject
             .handleEvents(receiveSubscription: { _ in
@@ -81,6 +76,8 @@ internal class PageFetcherSnapshot<Key: Equatable, Value: Any> {
     }
     
     func close() {
+        prependLoadTask?.cancel()
+        appendLoadTask?.cancel()
         subscriptions.forEach { $0.cancel() }
         subscriptions.removeAll()
     }
@@ -114,28 +111,6 @@ internal class PageFetcherSnapshot<Key: Equatable, Value: Any> {
         )
     }
     
-    private func startConsumingHintsIfNeeded() {
-        guard !hasStartedComsumingHints else { return }
-        hasStartedComsumingHints = true
-        startConsumingHints()
-    }
-    
-    private func retryFailed() async {
-        if stateHolder.withLock(block: { state in state.sourceLoadStates.get(.refresh) }) is LoadState.Error {
-            await doInitialLoad()
-            if !(self.stateHolder.withLock(block: { state in state.sourceLoadStates.get(.refresh) }) is LoadState.Error) {
-                startConsumingHintsIfNeeded()
-            }
-            return
-        }
-        let failedHints = stateHolder.withLock(block: { state in state.failedHintsByLoadType })
-        
-        for (loadType, hint) in failedHints {
-            stateHolder.withLock(block: { state in state.sourceLoadStates.set(loadType, .NotLoading(false)) })
-            hintHandler.forceSetHint(loadType, hint)
-        }
-    }
-    
     private func collectAsGenerationalViewportHints(_ publisher: AnyPublisher<Int, Never>, _ loadType: LoadType) {
         return publisher.flatMapLatest { generstionId -> AnyPublisher<GenerationalViewportHint, Never> in
             self.stateHolder.withLock { state in
@@ -155,13 +130,27 @@ internal class PageFetcherSnapshot<Key: Equatable, Value: Any> {
         .runningReduce { previous, next in
             next.shouldPrioritizeOver(previous, loadType) ? next : previous
         }
-        .buffer(size: 1, prefetch: .keepFull, whenFull: .dropOldest)
         .sink { generationalHint in
-            Task {
-                await self.doLoad(loadType, generationalHint)
+            switch loadType {
+            case .prepend:
+                self.prependLoadTask?.cancel()
+                self.prependLoadTask = self.loadTask(loadType, generationalHint)
+            case .append:
+                self.appendLoadTask?.cancel()
+                self.appendLoadTask = self.loadTask(loadType, generationalHint)
+            case .refresh:
+                fatalError("invalid load type for hints")
             }
         }
         .store(in: &subscriptions)
+    }
+
+    private func loadTask(_ loadType: LoadType, _ generationalHint: GenerationalViewportHint) -> Task<Void, Never> {
+        return Task {
+            if !Task.isCancelled {
+                await self.doLoad(loadType, generationalHint)
+            }
+        }
     }
     
     private func loadParams(_ loadType: LoadType, _ key: Key?) -> PagingSource<Key, Value>.LoadParams<Key> {
@@ -279,9 +268,9 @@ internal class PageFetcherSnapshot<Key: Equatable, Value: Any> {
             while loadKey != nil {
                 let params = loadParams(loadType, loadKey)
                 let result: PagingSource<Key, Value>.LoadResult<Key, Value> = await pagingSource.load(params: params)
-                
-                if currentPagingState().pages.flatMap({ $0.data }).count - params.loadSize != generationalHint.hint.presentedItemsBefore {
-                    break
+
+                if Task.isCancelled {
+                    return
                 }
                 switch result {
                 case let result as PagingSource<Key, Value>.LoadResult<Key, Value>.Page<Key, Value>:
